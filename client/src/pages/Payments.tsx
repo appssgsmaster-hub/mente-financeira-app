@@ -54,10 +54,10 @@ export default function Payments() {
     return map;
   }, [accounts]);
 
-  // Form states for new transactions
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [selectedAcc, setSelectedAcc] = useState<string>("");
+  const [txDate, setTxDate] = useState<string>(new Date().toISOString().split("T")[0]);
 
   // Modal states for editing
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -72,10 +72,10 @@ export default function Payments() {
     const val = parseMoneyInput(amount);
     if (!val || !desc) return toast({ title: "Erro", description: "Preencha valor e descrição", variant: "destructive" });
     
-    distributeIncome({ amount: Math.round(val * 100), description: desc }, {
+    distributeIncome({ amount: Math.round(val * 100), description: desc, date: txDate }, {
       onSuccess: () => {
         toast({ title: "Sucesso", description: "Entrada distribuída no ecossistema!" });
-        setDesc(""); setAmount("");
+        setDesc(""); setAmount(""); setTxDate(new Date().toISOString().split("T")[0]);
       }
     });
   }
@@ -85,16 +85,17 @@ export default function Payments() {
     if (!val || !desc || !selectedAcc) return toast({ title: "Erro", description: "Preencha todos os campos", variant: "destructive" });
     
     createExpense({
-      userId: 1,
+      userId: 0,
       description: desc,
       amount: Math.round(val * 100),
       type: "expense",
       accountId: Number(selectedAcc),
-      isRecurring: false
-    }, {
+      isRecurring: false,
+      date: txDate
+    } as any, {
       onSuccess: () => {
         toast({ title: "Sucesso", description: "Saída registrada com sucesso!" });
-        setDesc(""); setAmount(""); setSelectedAcc("");
+        setDesc(""); setAmount(""); setSelectedAcc(""); setTxDate(new Date().toISOString().split("T")[0]);
       }
     });
   }
@@ -159,10 +160,21 @@ export default function Payments() {
               value={amount}
               onChange={e => setAmount(e.target.value)}
             />
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-muted-foreground">Data do lançamento</label>
+              <input
+                type="date"
+                className="w-full p-3 rounded-2xl border border-input bg-background"
+                value={txDate}
+                onChange={e => setTxDate(e.target.value)}
+                data-testid="input-tx-date"
+              />
+            </div>
             <select
               className="w-full p-3 rounded-2xl border border-input bg-background"
               value={selectedAcc}
               onChange={e => setSelectedAcc(e.target.value)}
+              data-testid="select-account"
             >
               <option value="">Selecione a conta (apenas para Saídas)</option>
               {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}

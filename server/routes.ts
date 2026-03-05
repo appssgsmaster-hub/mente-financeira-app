@@ -204,6 +204,9 @@ export async function registerRoutes(
     try {
       const input = req.body;
       input.userId = req.session.userId!;
+      if (input.date) {
+        input.date = new Date(input.date);
+      }
       const newTx = await storage.createTransaction(input);
       res.status(201).json(newTx);
     } catch (err) {
@@ -214,7 +217,8 @@ export async function registerRoutes(
   app.post(api.transactions.distributeIncome.path, requireActiveSubscription, async (req, res) => {
     try {
       const input = req.body;
-      const result = await storage.distributeIncome(req.session.userId!, input);
+      const date = input.date ? new Date(input.date) : undefined;
+      const result = await storage.distributeIncome(req.session.userId!, { amount: input.amount, description: input.description }, date);
       res.json(result);
     } catch (err) {
       res.status(400).json({ message: "Erro ao distribuir entrada" });

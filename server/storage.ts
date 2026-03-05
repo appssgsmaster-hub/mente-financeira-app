@@ -119,15 +119,17 @@ export class DatabaseStorage implements IStorage {
     return newTx;
   }
 
-  async distributeIncome(userId: number, request: DistributeIncomeRequest): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
+  async distributeIncome(userId: number, request: DistributeIncomeRequest, date?: Date): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
     const userAccounts = await this.getAccounts(userId);
-    const [newTx] = await db.insert(transactions).values({
+    const txValues: any = {
       userId,
       description: request.description,
       amount: request.amount,
       type: 'income',
-      isRecurring: false
-    }).returning();
+      isRecurring: false,
+    };
+    if (date) txValues.date = date;
+    const [newTx] = await db.insert(transactions).values(txValues).returning();
 
     const updatedAccounts = [];
     for (const acc of userAccounts) {

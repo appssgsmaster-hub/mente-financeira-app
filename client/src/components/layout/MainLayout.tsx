@@ -1,18 +1,42 @@
 import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
-import { useUser } from "@/hooks/use-finance";
-import { Bell, Search, User as UserIcon } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Bell, Search, User as UserIcon, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function MainLayout({ children }: { children: ReactNode }) {
-  const { data: user, isLoading } = useUser();
+  const { user, isLoading, logout } = useAuth();
 
   const style = {
     "--sidebar-width": "18rem",
     "--sidebar-width-icon": "4rem",
   };
+
+  function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Bom dia";
+    if (hour < 18) return "Boa tarde";
+    return "Boa noite";
+  }
+
+  function getTrialDaysLeft() {
+    if (!user?.trialEndDate || user.subscriptionStatus !== "trial") return null;
+    const end = new Date(user.trialEndDate);
+    const now = new Date();
+    const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(0, diff);
+  }
+
+  const trialDays = getTrialDaysLeft();
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
@@ -27,12 +51,19 @@ export function MainLayout({ children }: { children: ReactNode }) {
                   <Skeleton className="h-8 w-48 rounded-md" />
                 ) : (
                   <h1 className="text-2xl font-display font-semibold text-foreground">
-                    Bom dia, <span className="text-primary italic">{user?.name || 'Prosperidade'}!</span>
+                    {getGreeting()}, <span className="text-primary italic">{user?.name?.split(' ')[0] || 'Prosperidade'}!</span>
                   </h1>
                 )}
-                <p className="text-sm text-muted-foreground hidden sm:block">
-                  Acompanhe seu ecossistema financeiro.
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-muted-foreground hidden sm:block">
+                    Acompanhe seu ecossistema financeiro.
+                  </p>
+                  {trialDays !== null && (
+                    <span className="text-xs bg-secondary/10 text-secondary px-2.5 py-0.5 rounded-full font-semibold hidden sm:inline-block" data-testid="text-trial-badge">
+                      {trialDays} {trialDays === 1 ? 'dia' : 'dias'} de teste
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             
@@ -45,10 +76,29 @@ export function MainLayout({ children }: { children: ReactNode }) {
                 <span className="absolute top-2 right-2 w-2 h-2 bg-secondary rounded-full border-2 border-background"></span>
               </Button>
               <div className="w-px h-8 bg-border/50 mx-2 hidden sm:block"></div>
-              <Button variant="outline" className="rounded-full gap-2 hidden sm:flex border-border/50 hover:bg-accent">
-                <UserIcon className="w-4 h-4" />
-                <span className="font-medium text-sm">Meu Perfil</span>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="rounded-full gap-2 hidden sm:flex border-border/50 hover:bg-accent" data-testid="button-user-menu">
+                    <UserIcon className="w-4 h-4" />
+                    <span className="font-medium text-sm max-w-[120px] truncate">{user?.name?.split(' ')[0]}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-3 py-2">
+                    <p className="font-medium text-sm">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => logout()}
+                    className="text-destructive cursor-pointer"
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
           

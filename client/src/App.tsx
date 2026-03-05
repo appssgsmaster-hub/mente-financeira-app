@@ -5,15 +5,50 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "./components/layout/MainLayout";
+import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Projections from "./pages/Projections";
 import Payments from "./pages/Payments";
 import Education from "./pages/Education";
 import Plans from "./pages/Plans";
+import { Loader2 } from "lucide-react";
 
-function Router() {
+function AppRoutes() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground font-medium">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  const isExpired = user.subscriptionStatus === "trial_expired" || user.subscriptionStatus === "canceled";
+
+  if (isExpired) {
+    return (
+      <MainLayout>
+        <Switch>
+          <Route path="/planos" component={Plans} />
+          <Route>
+            <Plans />
+          </Route>
+        </Switch>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <Switch>
@@ -23,7 +58,6 @@ function Router() {
         <Route path="/pagamentos" component={Payments} />
         <Route path="/educacao" component={Education} />
         <Route path="/planos" component={Plans} />
-        {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>
     </MainLayout>
@@ -35,7 +69,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

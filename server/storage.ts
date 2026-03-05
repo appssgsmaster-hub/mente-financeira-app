@@ -7,10 +7,13 @@ import {
   type UpdateAccountPercentagesRequest,
   type DistributeIncomeRequest
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(data: { name: string; email: string; passwordHash: string }): Promise<User>;
+  updateUser(id: number, data: Partial<User>): Promise<User>;
   getAccounts(userId: number): Promise<Account[]>;
   updateAccountPercentages(userId: number, updates: UpdateAccountPercentagesRequest['updates']): Promise<Account[]>;
   getTransactions(userId: number): Promise<Transaction[]>;
@@ -23,12 +26,57 @@ export interface IStorage {
   updateAccount(id: number, data: Partial<Account>): Promise<Account>;
   deleteAccount(id: number): Promise<void>;
   resetAllData(userId: number): Promise<void>;
+  seedDefaultAccounts(userId: number): Promise<void>;
+  getStripeProduct(productId: string): Promise<any>;
+  getStripeSubscription(subscriptionId: string): Promise<any>;
+  listStripeProductsWithPrices(): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
+    return user;
+  }
+
+  async createUser(data: { name: string; email: string; passwordHash: string }): Promise<User> {
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 15);
+
+    const [user] = await db.insert(users).values({
+      name: data.name,
+      email: data.email.toLowerCase(),
+      passwordHash: data.passwordHash,
+      currency: "BRL",
+      trialEndDate: trialEnd,
+      subscriptionStatus: "trial",
+    }).returning();
+    return user;
+  }
+
+  async updateUser(id: number, data: Partial<User>): Promise<User> {
+    const [updated] = await db.update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
+    if (!updated) throw new Error("Usuário não encontrado");
+    return updated;
+  }
+
+  async seedDefaultAccounts(userId: number): Promise<void> {
+    const initialAccounts = [
+      { name: "Vida Financeira PF", percentage: 50, color: "#4F46E5", userId, balance: 0 },
+      { name: "Conta Operacional", percentage: 10, color: "#22C55E", userId, balance: 0 },
+      { name: "Taxas & Obrigações", percentage: 10, color: "#EF4444", userId, balance: 0 },
+      { name: "Conta de Oportunidades", percentage: 10, color: "#F59E0B", userId, balance: 0 },
+      { name: "Lucro / Doação", percentage: 10, color: "#8B5CF6", userId, balance: 0 },
+      { name: "Reserva / Estabilidade", percentage: 10, color: "#06B6D4", userId, balance: 0 },
+    ];
+    await db.insert(accounts).values(initialAccounts);
   }
 
   async getAccounts(userId: number): Promise<Account[]> {
@@ -116,6 +164,18 @@ export class DatabaseStorage implements IStorage {
     await db.delete(transactions).where(eq(transactions.id, id));
   }
 
+  async updateTransactionForUser(userId: number, id: number, data: Partial<Transaction>): Promise<Transaction> {
+    const [oldTx] = await db.select().from(transactions).where(eq(transactions.id, id));
+    if (!oldTx || oldTx.userId !== userId) throw new Error("Transação não encontrada");
+    return this.updateTransaction(id, data);
+  }
+
+  async deleteTransactionForUser(userId: number, id: number): Promise<void> {
+    const [tx] = await db.select().from(transactions).where(eq(transactions.id, id));
+    if (!tx || tx.userId !== userId) throw new Error("Transação não encontrada");
+    return this.deleteTransaction(id);
+  }
+
   async updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction> {
     const [oldTx] = await db.select().from(transactions).where(eq(transactions.id, id));
     if (!oldTx) throw new Error("Transação não encontrada");
@@ -151,6 +211,23 @@ export class DatabaseStorage implements IStorage {
     return newAccount;
   }
 
+  async updateAccountForUser(userId: number, id: number, data: Partial<Account>): Promise<Account> {
+    const [existing] = await db.select().from(accounts).where(eq(accounts.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Conta não encontrada");
+    const [updated] = await db.update(accounts)
+      .set(data)
+      .where(eq(accounts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteAccountForUser(userId: number, id: number): Promise<void> {
+    const [existing] = await db.select().from(accounts).where(eq(accounts.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Conta não encontrada");
+    await db.delete(transactions).where(eq(transactions.accountId, id));
+    await db.delete(accounts).where(eq(accounts.id, id));
+  }
+
   async updateAccount(id: number, data: Partial<Account>): Promise<Account> {
     const [updated] = await db.update(accounts)
       .set(data)
@@ -161,8 +238,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteAccount(id: number): Promise<void> {
-    // Reallocate balance to first account or just delete? 
-    // Usually better to delete transactions associated too
     await db.delete(transactions).where(eq(transactions.accountId, id));
     await db.delete(accounts).where(eq(accounts.id, id));
   }
@@ -172,6 +247,43 @@ export class DatabaseStorage implements IStorage {
     await db.update(accounts)
       .set({ balance: 0 })
       .where(eq(accounts.userId, userId));
+  }
+
+  async getStripeProduct(productId: string): Promise<any> {
+    const result = await db.execute(
+      sql`SELECT * FROM stripe.products WHERE id = ${productId}`
+    );
+    return result.rows[0] || null;
+  }
+
+  async getStripeSubscription(subscriptionId: string): Promise<any> {
+    const result = await db.execute(
+      sql`SELECT * FROM stripe.subscriptions WHERE id = ${subscriptionId}`
+    );
+    return result.rows[0] || null;
+  }
+
+  async listStripeProductsWithPrices(): Promise<any[]> {
+    const result = await db.execute(
+      sql`
+        SELECT 
+          p.id as product_id,
+          p.name as product_name,
+          p.description as product_description,
+          p.active as product_active,
+          p.metadata as product_metadata,
+          pr.id as price_id,
+          pr.unit_amount,
+          pr.currency,
+          pr.recurring,
+          pr.active as price_active
+        FROM stripe.products p
+        LEFT JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
+        WHERE p.active = true
+        ORDER BY p.id, pr.unit_amount
+      `
+    );
+    return result.rows;
   }
 }
 

@@ -6,10 +6,18 @@ import type { User, Account, Transaction } from "@shared/schema";
 async function fetchWithZod<T>(
   url: string,
   options: RequestInit,
-  schema: any, // using any for zod schema to bypass complex inference errors locally
+  schema: any,
 ): Promise<T> {
   const res = await fetch(url, { ...options, credentials: "include" });
   if (!res.ok) {
+    if (res.status === 401) {
+      window.location.href = "/";
+      throw new Error("Sessão expirada");
+    }
+    if (res.status === 403) {
+      window.location.href = "/planos";
+      throw new Error("Acesso restrito");
+    }
     let errorMessage = "Ocorreu um erro";
     try {
       const errData = await res.json();
@@ -18,7 +26,6 @@ async function fetchWithZod<T>(
     throw new Error(errorMessage);
   }
   const data = await res.json();
-  // Safe parsing
   const result = schema.safeParse(data);
   if (!result.success) {
     console.error("Zod Validation Error:", result.error.format());

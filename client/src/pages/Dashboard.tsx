@@ -3,9 +3,13 @@ import { formatCurrency } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import {
-  ArrowUpRight,
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Wallet, 
+  ArrowUpRight, 
   ArrowDownRight,
+  PlusCircle, 
   Download,
   RefreshCw,
 } from "lucide-react";
@@ -97,35 +101,36 @@ export default function Dashboard() {
             </Button>
           </div>
 
-          {/* Entradas & Saídas lado a lado */}
-          <div className="grid grid-cols-2 gap-4 mt-6 w-full">
-            <div className="flex items-center gap-3 bg-secondary/10 px-4 py-3 rounded-xl border border-secondary/20">
-              <div className="p-2 bg-secondary/20 rounded-full text-secondary">
-                <ArrowUpRight className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">
-                  Entradas Mês
-                </p>
-                <p className="font-semibold text-foreground truncate">
-                  + {formatValue(totalIncome)}
+          {/* Mensagem de Incentivo Dinâmica */}
+          <div className="mt-6 w-full">
+            {totalIncome > totalExpense ? (
+              <div className="flex items-center gap-3 bg-secondary/10 px-4 py-4 rounded-2xl border border-secondary/20">
+                <div className="p-2 bg-secondary/20 rounded-full text-secondary">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+                <p className="text-sm font-medium text-secondary-foreground">
+                  Parabéns! Suas entradas estão superando as saídas. Continue focado na solução!
                 </p>
               </div>
-            </div>
-
-            <div className="flex items-center gap-3 bg-destructive/10 px-4 py-3 rounded-xl border border-destructive/20">
-              <div className="p-2 bg-destructive/20 rounded-full text-destructive">
-                <ArrowDownRight className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground font-medium">
-                  Saídas Mês
-                </p>
-                <p className="font-semibold text-foreground truncate">
-                  - {formatValue(totalExpense)}
+            ) : totalExpense > 0 ? (
+              <div className="flex items-center gap-3 bg-destructive/10 px-4 py-4 rounded-2xl border border-destructive/20">
+                <div className="p-2 bg-destructive/20 rounded-full text-destructive">
+                  <TrendingDown className="w-4 h-4" />
+                </div>
+                <p className="text-sm font-medium text-destructive-foreground">
+                  Atenção: Suas saídas estão altas. Revise suas contas e priorize o essencial.
                 </p>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-3 bg-primary/10 px-4 py-4 rounded-2xl border border-primary/20">
+                <div className="p-2 bg-primary/20 rounded-full text-primary">
+                  <ArrowUpRight className="w-4 h-4" />
+                </div>
+                <p className="text-sm font-medium text-primary-foreground">
+                  Comece registrando suas entradas em "Pagamentos" para ver seu ecossistema prosperar!
+                </p>
+              </div>
+            )}
           </div>
         </Card>
 

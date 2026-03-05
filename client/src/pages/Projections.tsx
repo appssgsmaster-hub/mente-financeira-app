@@ -148,16 +148,17 @@ export default function Projections() {
   const totalBalance = accounts?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
 
   const chartData = useMemo(() => {
+    let runningBalance = totalBalance;
+    
     return Array.from({ length: 6 }, (_, i) => {
       const d = new Date();
       d.setMonth(now.getMonth() + i);
       const mIdx = d.getMonth();
       const mName = MONTHS[mIdx];
-      
       const year = d.getFullYear();
       const msEnd = new Date(year, mIdx + 1, 0).getTime();
 
-      // Somar todos os compromissos que impactam este mês específico da projeção
+      // Somar todos os compromissos que impactam este mês específico
       const monthCommitments = items.reduce((sum, c) => {
         const startDate = new Date(c.startDate);
         const startT = startDate.getTime();
@@ -173,12 +174,12 @@ export default function Projections() {
         }
       }, 0);
 
-      // Projeção simples: Saldo Atual - Compromissos do mês
-      const projectedValue = (totalBalance - monthCommitments) / 100;
+      // O patrimônio acumulado diminui conforme os gastos mensais (já que não temos projeção de receita ainda)
+      runningBalance = Math.max(0, runningBalance - monthCommitments);
       
       return { 
         name: mName, 
-        valor: Math.max(0, projectedValue)
+        valor: runningBalance / 100
       };
     });
   }, [totalBalance, items, now]);
@@ -251,12 +252,18 @@ export default function Projections() {
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} hide />
+                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => formatCurrency(val * 100).split(',')[0]} width={80} />
                 <RechartsTooltip 
                   formatter={(val: number) => [formatCurrency(val * 100), "Patrimônio Estimado"]}
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Bar dataKey="valor" fill="#4F46E5" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="valor" fill="url(#colorVal)" radius={[8, 8, 0, 0]} />
+                <defs>
+                  <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0.3}/>
+                  </linearGradient>
+                </defs>
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -38,7 +38,9 @@ type Commitment = {
   createdAt: string;
 };
 
-const LS_KEY = "sgs_commitments_v1";
+function getLsKey(userId?: number) {
+  return userId ? `sgs_commitments_v1_user_${userId}` : "sgs_commitments_v1";
+}
 
 const CATEGORIES = [
   "Estrutura Física",
@@ -102,19 +104,25 @@ export default function Projections() {
   const [installmentsStr, setInstallmentsStr] = useState<string>("1");
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
 
+  const lsKey = getLsKey(user?.id);
+
   useEffect(() => {
+    if (!user?.id) return;
     try {
-      const raw = localStorage.getItem(LS_KEY);
+      const raw = localStorage.getItem(lsKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) setItems(parsed);
+      } else {
+        setItems([]);
       }
     } catch {}
-  }, []);
+  }, [user?.id, lsKey]);
 
   useEffect(() => {
-    localStorage.setItem(LS_KEY, JSON.stringify(items));
-  }, [items]);
+    if (!user?.id) return;
+    localStorage.setItem(lsKey, JSON.stringify(items));
+  }, [items, lsKey, user?.id]);
 
   useEffect(() => {
     if (accounts?.length && !accountId) {

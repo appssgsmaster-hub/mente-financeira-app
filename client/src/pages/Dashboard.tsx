@@ -52,17 +52,20 @@ export default function Dashboard() {
       ?.filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0) || 0;
 
-  // Carregar compromissos do LocalStorage para alertas
   const [commitments, setCommitments] = useState<any[]>([]);
   useEffect(() => {
+    if (!user?.id) return;
     try {
-      const raw = localStorage.getItem("sgs_commitments_v1");
+      const lsKey = `sgs_commitments_v1_user_${user.id}`;
+      const raw = localStorage.getItem(lsKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) setCommitments(parsed);
+      } else {
+        setCommitments([]);
       }
     } catch {}
-  }, []);
+  }, [user?.id]);
 
   const alerts = useMemo(() => {
     const now = new Date();

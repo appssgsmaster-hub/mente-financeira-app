@@ -131,6 +131,13 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updated;
   }
+
+  async resetAllData(userId: number): Promise<void> {
+    await db.delete(transactions).where(eq(transactions.userId, userId));
+    await db.update(accounts)
+      .set({ balance: 0 })
+      .where(eq(accounts.userId, userId));
+  }
 }
 
 export const storage = new DatabaseStorage();

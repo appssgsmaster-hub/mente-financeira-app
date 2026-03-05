@@ -102,6 +102,13 @@ export const api = {
         }),
       },
     },
+    reset: {
+      method: "POST" as const,
+      path: "/api/transactions/reset" as const,
+      responses: {
+        200: z.object({ ok: z.literal(true) }),
+      },
+    },
   },
 };
 

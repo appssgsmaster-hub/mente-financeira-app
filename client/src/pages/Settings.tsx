@@ -57,8 +57,16 @@ export default function Settings() {
   };
 
   const handleReset = () => {
-    localStorage.clear();
-    window.location.reload();
+    if (!confirm("Tem certeza que deseja apagar TODOS os dados? Esta ação não pode ser desfeita.")) return;
+    
+    fetch("/api/transactions/reset", { method: "POST" })
+      .then(() => {
+        toast({ title: "Ecossistema Resetado", description: "Todos os saldos e transações foram apagados." });
+        window.location.reload();
+      })
+      .catch(() => {
+        toast({ title: "Erro", description: "Não foi possível resetar os dados.", variant: "destructive" });
+      });
   };
 
   if (isLoading || !accounts) {

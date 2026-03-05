@@ -16,6 +16,8 @@ export interface IStorage {
   getTransactions(userId: number): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   distributeIncome(userId: number, request: DistributeIncomeRequest): Promise<{ transaction: Transaction; updatedAccounts: Account[] }>;
+  deleteTransaction(id: number): Promise<void>;
+  updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -29,7 +31,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateAccountPercentages(userId: number, updates: UpdateAccountPercentagesRequest['updates']): Promise<Account[]> {
-    // Validate sum is 100%
     const total = updates.reduce((sum, u) => sum + u.percentage, 0);
     if (total !== 100) {
       throw new Error("As porcentagens devem somar exatamente 100%.");
@@ -54,7 +55,6 @@ export class DatabaseStorage implements IStorage {
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
     if (transaction.type === 'expense' && transaction.accountId) {
-      // Deduct from account balance
       const [account] = await db.select().from(accounts).where(eq(accounts.id, transaction.accountId));
       if (account) {
         await db.update(accounts)
@@ -62,15 +62,12 @@ export class DatabaseStorage implements IStorage {
           .where(eq(accounts.id, transaction.accountId));
       }
     }
-    
     const [newTx] = await db.insert(transactions).values(transaction).returning();
     return newTx;
   }
 
   async distributeIncome(userId: number, request: DistributeIncomeRequest): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
     const userAccounts = await this.getAccounts(userId);
-    
-    // Create the income transaction
     const [newTx] = await db.insert(transactions).values({
       userId,
       description: request.description,
@@ -80,8 +77,6 @@ export class DatabaseStorage implements IStorage {
     }).returning();
 
     const updatedAccounts = [];
-    
-    // Distribute balance based on percentage
     for (const acc of userAccounts) {
       const share = Math.floor(request.amount * (acc.percentage / 100));
       const [updated] = await db.update(accounts)
@@ -90,8 +85,51 @@ export class DatabaseStorage implements IStorage {
         .returning();
       if (updated) updatedAccounts.push(updated);
     }
-
     return { transaction: newTx, updatedAccounts };
+  }
+
+  async deleteTransaction(id: number): Promise<void> {
+    const [tx] = await db.select().from(transactions).where(eq(transactions.id, id));
+    if (!tx) throw new Error("Transação não encontrada");
+
+    if (tx.type === 'expense' && tx.accountId) {
+      const [acc] = await db.select().from(accounts).where(eq(accounts.id, tx.accountId));
+      if (acc) {
+        await db.update(accounts)
+          .set({ balance: acc.balance + tx.amount })
+          .where(eq(accounts.id, tx.accountId));
+      }
+    } else if (tx.type === 'income') {
+      const userAccounts = await db.select().from(accounts).where(eq(accounts.userId, tx.userId));
+      for (const acc of userAccounts) {
+        const share = Math.floor(tx.amount * (acc.percentage / 100));
+        await db.update(accounts)
+          .set({ balance: acc.balance - share })
+          .where(eq(accounts.id, acc.id));
+      }
+    }
+    await db.delete(transactions).where(eq(transactions.id, id));
+  }
+
+  async updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction> {
+    const [oldTx] = await db.select().from(transactions).where(eq(transactions.id, id));
+    if (!oldTx) throw new Error("Transação não encontrada");
+
+    if (data.amount !== undefined && data.amount !== oldTx.amount && oldTx.type === 'expense' && oldTx.accountId) {
+      const [acc] = await db.select().from(accounts).where(eq(accounts.id, oldTx.accountId));
+      if (acc) {
+        const diff = data.amount - oldTx.amount;
+        await db.update(accounts)
+          .set({ balance: acc.balance - diff })
+          .where(eq(accounts.id, oldTx.accountId));
+      }
+    }
+
+    const [updated] = await db.update(transactions)
+      .set(data)
+      .where(eq(transactions.id, id))
+      .returning();
+    return updated;
   }
 }
 

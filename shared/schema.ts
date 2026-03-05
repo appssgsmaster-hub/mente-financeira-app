@@ -33,7 +33,12 @@ export const transactions = pgTable("transactions", {
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true });
-export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, date: true });
+export const insertTransactionSchema = createInsertSchema(transactions)
+  .omit({ id: true, date: true })
+  .extend({
+    amount: z.number(),
+    accountId: z.number().optional().nullable(),
+  });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

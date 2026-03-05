@@ -1,304 +1,286 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { useAccounts, useDistributeIncome, useCreateTransaction, useTransactions } from "@/hooks/use-finance";
-import { parseCurrencyInput, formatCurrency } from "@/lib/format";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
-import { ArrowDownRight, ArrowUpRight, Loader2, Receipt } from "lucide-react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ArrowUpRight, Receipt, Pencil, Trash2 } from "lucide-react";
 
-// Validation schemas for local forms
-const incomeSchema = z.object({
-  amountStr: z.string().min(1, "Obrigatório"),
-  description: z.string().min(3, "Mínimo 3 caracteres"),
-});
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import {
+  useAccounts,
+  useTransactions,
+  useUpdateTransaction,
+  useDeleteTransaction,
+} from "@/hooks/use-finance";
 
-const expenseSchema = z.object({
-  amountStr: z.string().min(1, "Obrigatório"),
-  description: z.string().min(3, "Mínimo 3 caracteres"),
-  accountId: z.string().min(1, "Selecione uma conta"),
-  isRecurring: z.boolean().default(false),
-});
+// --- helpers (evita 200 virar 22,00) ---
+function parseMoneyInput(raw: string) {
+  // deixa só números, vírgula e ponto
+  let v = raw.replace(/[^\d.,-]/g, "");
+
+  // se tiver vírgula e ponto, assume ponto como milhar e vírgula como decimal
+  if (v.includes(",") && v.includes(".")) {
+    v = v.replace(/\./g, "").replace(",", ".");
+  } else if (v.includes(",")) {
+    // só vírgula -> decimal
+    v = v.replace(",", ".");
+  }
+
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatCurrency(value: number, currency = "BRL") {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value / 100);
+}
 
 export default function Payments() {
-  const { data: accounts } = useAccounts();
-  const { data: transactions } = useTransactions();
-  const { mutate: distributeIncome, isPending: incomePending } = useDistributeIncome();
-  const { mutate: createExpense, isPending: expensePending } = useCreateTransaction();
   const { toast } = useToast();
 
-  const [incomeOpen, setIncomeOpen] = useState(false);
-  const [expenseOpen, setExpenseOpen] = useState(false);
+  const { data: accounts } = useAccounts();
+  const { data: transactions } = useTransactions();
 
-  const incomeForm = useForm<z.infer<typeof incomeSchema>>({
-    resolver: zodResolver(incomeSchema),
-    defaultValues: { amountStr: "", description: "" },
-  });
+  const { mutate: updateTx, isPending: isUpdating } = useUpdateTransaction();
+  const { mutate: deleteTx, isPending: isDeleting } = useDeleteTransaction();
 
-  const expenseForm = useForm<z.infer<typeof expenseSchema>>({
-    resolver: zodResolver(expenseSchema),
-    defaultValues: { amountStr: "", description: "", accountId: "", isRecurring: false },
-  });
+  const accountsById = useMemo(() => {
+    const map = new Map<number, { id: number; name: string }>();
+    (accounts || []).forEach((a) => map.set(a.id, { id: a.id, name: a.name }));
+    return map;
+  }, [accounts]);
 
-  const onIncomeSubmit = (data: z.infer<typeof incomeSchema>) => {
-    const amount = parseCurrencyInput(data.amountStr);
-    if (amount <= 0) return incomeForm.setError("amountStr", { message: "Valor inválido" });
-    
-    distributeIncome(
-      { amount, description: data.description },
+  // Modal simples de edição
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const editingTx = useMemo(
+    () => (transactions || []).find((t: any) => t.id === editingId) || null,
+    [transactions, editingId]
+  );
+
+  const [editDescription, setEditDescription] = useState("");
+  const [editAmountRaw, setEditAmountRaw] = useState("");
+
+  function openEdit(tx: any) {
+    setEditingId(tx.id);
+    setEditDescription(tx.description || "");
+    setEditAmountRaw(String(tx.amount / 100));
+  }
+
+  function closeEdit() {
+    setEditingId(null);
+    setEditDescription("");
+    setEditAmountRaw("");
+  }
+
+  function handleSaveEdit() {
+    if (!editingTx) return;
+
+    const amount = Math.round(parseMoneyInput(editAmountRaw) * 100);
+
+    updateTx(
       {
-        onSuccess: () => {
-          toast({ title: "Entrada distribuída com sucesso!" });
-          setIncomeOpen(false);
-          incomeForm.reset();
-        }
-      }
-    );
-  };
-
-  const onExpenseSubmit = (data: z.infer<typeof expenseSchema>) => {
-    const amount = parseCurrencyInput(data.amountStr);
-    if (amount <= 0) return expenseForm.setError("amountStr", { message: "Valor inválido" });
-    
-    createExpense(
-      { 
-        amount, 
-        description: data.description, 
-        accountId: Number(data.accountId),
-        type: 'expense',
-        isRecurring: data.isRecurring,
-        category: 'Geral',
-        userId: 1 // Default mocked userId
+        id: editingTx.id,
+        data: {
+          description: editDescription,
+          amount,
+        } as any,
       },
       {
         onSuccess: () => {
-          toast({ title: "Gasto registrado com sucesso!" });
-          setExpenseOpen(false);
-          expenseForm.reset();
-        }
+          toast({ title: "Atualizado", description: "Transação atualizada." });
+          closeEdit();
+        },
+        onError: (e: any) => {
+          toast({
+            title: "Erro",
+            description: e?.message || "Não foi possível atualizar.",
+            variant: "destructive",
+          });
+        },
       }
     );
-  };
+  }
+
+  function handleDelete(id: number) {
+    deleteTx(id, {
+      onSuccess: () => {
+        toast({ title: "Apagado", description: "Transação removida." });
+      },
+      onError: (e: any) => {
+        toast({
+          title: "Erro",
+          description: e?.message || "Não foi possível apagar.",
+          variant: "destructive",
+        });
+      },
+    });
+  }
+
+  const list = useMemo(() => {
+    const arr = (transactions || []) as any[];
+    // mais recentes primeiro
+    return [...arr].sort((a, b) => {
+      const da = new Date(a.date).getTime();
+      const db = new Date(b.date).getTime();
+      return db - da;
+    });
+  }, [transactions]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
-      <div>
-        <h1 className="text-3xl font-display font-bold text-foreground">Lançamentos</h1>
-        <p className="text-muted-foreground mt-1">Registre suas entradas e despesas com precisão.</p>
+    <div className="max-w-5xl mx-auto space-y-8 pb-12">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-4xl font-display font-bold text-foreground">
+            Histórico Completo
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Edite ou apague entradas e saídas. O ecossistema será atualizado automaticamente.
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <button 
-          onClick={() => setIncomeOpen(true)}
-          className="flex flex-col items-center justify-center p-12 rounded-3xl border-2 border-secondary/20 bg-secondary/5 hover:bg-secondary/10 transition-colors group"
-        >
-          <div className="w-16 h-16 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center mb-4 group-hover:-translate-y-2 transition-transform duration-300 shadow-lg shadow-secondary/30">
-            <ArrowUpRight className="w-8 h-8" />
-          </div>
-          <h3 className="text-2xl font-display font-bold text-foreground">Registrar Entrada</h3>
-          <p className="text-muted-foreground mt-2 text-center max-w-xs">
-            Distribui o valor automaticamente entre suas contas baseado nas porcentagens.
-          </p>
-        </button>
+      <Card className="rounded-3xl border border-border p-0 overflow-hidden">
+        <div className="divide-y divide-border">
+          {list.length === 0 ? (
+            <div className="p-12 text-center text-muted-foreground">
+              Nenhuma transação encontrada.
+            </div>
+          ) : (
+            list.map((tx) => {
+              const isIncome = tx.type === "income";
+              const accountName =
+                tx.accountId != null
+                  ? accountsById.get(tx.accountId)?.name || "Conta"
+                  : isIncome
+                  ? "Distribuído no ecossistema"
+                  : "Conta Operacional";
 
-        <button 
-          onClick={() => setExpenseOpen(true)}
-          className="flex flex-col items-center justify-center p-12 rounded-3xl border-2 border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors group"
-        >
-          <div className="w-16 h-16 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center mb-4 group-hover:-translate-y-2 transition-transform duration-300 shadow-lg shadow-destructive/30">
-            <ArrowDownRight className="w-8 h-8" />
-          </div>
-          <h3 className="text-2xl font-display font-bold text-foreground">Registrar Gasto</h3>
-          <p className="text-muted-foreground mt-2 text-center max-w-xs">
-            Deduz o valor diretamente de uma conta específica do seu ecossistema.
-          </p>
-        </button>
-      </div>
-
-      <div>
-        <h3 className="text-2xl font-display font-bold text-foreground mb-6 mt-12">Histórico Completo</h3>
-        <Card className="rounded-3xl border-border/50 overflow-hidden">
-          <div className="divide-y divide-border/50">
-            {transactions?.map((tx) => (
-              <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                <div className="flex items-center gap-5">
-                  <div className={`p-4 rounded-2xl ${tx.type === 'income' ? 'bg-secondary/10 text-secondary' : 'bg-destructive/10 text-destructive'}`}>
-                    {tx.type === 'income' ? <ArrowUpRight className="w-6 h-6" /> : <Receipt className="w-6 h-6" />}
-                  </div>
-                  <div>
-                    <p className="font-bold text-foreground text-lg">{tx.description}</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(tx.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
-                      </p>
-                      {tx.isRecurring && (
-                        <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-md text-xs font-semibold">
-                          Recorrente
-                        </span>
+              return (
+                <div
+                  key={tx.id}
+                  className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-5">
+                    <div
+                      className={`p-4 rounded-2xl ${
+                        isIncome
+                          ? "bg-secondary/10 text-secondary"
+                          : "bg-destructive/10 text-destructive"
+                      }`}
+                    >
+                      {isIncome ? (
+                        <ArrowUpRight className="w-6 h-6" />
+                      ) : (
+                        <Receipt className="w-6 h-6" />
                       )}
                     </div>
+
+                    <div>
+                      <p className="font-bold text-foreground text-lg">
+                        {tx.description || "-"}
+                      </p>
+
+                      <div className="flex flex-col gap-1 mt-1">
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(tx.date), "dd 'de' MMMM, yyyy", {
+                            locale: ptBR,
+                          })}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {accountName}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p
+                        className={`text-xl font-bold ${
+                          isIncome ? "text-secondary" : "text-destructive"
+                        }`}
+                      >
+                        {isIncome ? "+" : "-"} {formatCurrency(tx.amount)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-xl hover:bg-muted"
+                        onClick={() => openEdit(tx)}
+                      >
+                        <Pencil className="w-5 h-5 text-muted-foreground" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-xl hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                        onClick={() => handleDelete(tx.id)}
+                        disabled={isDeleting}
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className={`font-bold font-display text-xl ${tx.type === 'income' ? 'text-secondary' : 'text-foreground'}`}>
-                    {tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount)}
-                  </p>
-                  {tx.accountId && accounts && (
-                    <p className="text-sm font-medium text-muted-foreground mt-1">
-                      {accounts.find(a => a.id === tx.accountId)?.name}
-                    </p>
-                  )}
-                  {!tx.accountId && tx.type === 'income' && (
-                    <p className="text-sm font-medium text-secondary mt-1">
-                      Distribuído no ecossistema
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })
+          )}
+        </div>
+      </Card>
+
+      {/* Modal de Edição Simples */}
+      {editingId && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md p-6 space-y-6 rounded-3xl shadow-2xl border-border">
+            <h2 className="text-2xl font-display font-bold">Editar Transação</h2>
             
-            {(!transactions || transactions.length === 0) && (
-              <div className="p-16 text-center text-muted-foreground">
-                Sem histórico de movimentações.
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Descrição</label>
+                <input
+                  type="text"
+                  className="w-full p-3 rounded-2xl border border-input bg-background"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                />
               </div>
-            )}
-          </div>
-        </Card>
-      </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Valor (R$)</label>
+                <input
+                  type="text"
+                  className="w-full p-3 rounded-2xl border border-input bg-background"
+                  value={editAmountRaw}
+                  onChange={(e) => setEditAmountRaw(e.target.value)}
+                />
+              </div>
+            </div>
 
-      {/* Income Dialog */}
-      <Dialog open={incomeOpen} onOpenChange={setIncomeOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl">Nova Entrada</DialogTitle>
-            <DialogDescription>O valor será dividido automaticamente entre as contas.</DialogDescription>
-          </DialogHeader>
-          <Form {...incomeForm}>
-            <form onSubmit={incomeForm.handleSubmit(onIncomeSubmit)} className="space-y-6 mt-4">
-              <FormField
-                control={incomeForm.control}
-                name="amountStr"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Valor (R$)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="0,00" className="text-lg py-6 rounded-xl" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={incomeForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Salário" className="rounded-xl" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full rounded-xl py-6 text-lg shadow-lg" disabled={incomePending}>
-                {incomePending && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
-                Processar Distribuição
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-2xl"
+                onClick={closeEdit}
+              >
+                Cancelar
               </Button>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Expense Dialog */}
-      <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl">Registrar Gasto</DialogTitle>
-            <DialogDescription>Deduz o valor de uma conta específica.</DialogDescription>
-          </DialogHeader>
-          <Form {...expenseForm}>
-            <form onSubmit={expenseForm.handleSubmit(onExpenseSubmit)} className="space-y-5 mt-4">
-              <FormField
-                control={expenseForm.control}
-                name="amountStr"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Valor (R$)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="0,00" className="text-lg py-6 rounded-xl" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={expenseForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição do Gasto</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Conta de Luz" className="rounded-xl" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={expenseForm.control}
-                name="accountId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>De qual conta saiu?</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue placeholder="Selecione a conta" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {accounts?.map((acc) => (
-                          <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={expenseForm.control}
-                name="isRecurring"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-xl border border-border/50 p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base font-semibold">Gasto Recorrente</FormLabel>
-                      <p className="text-sm text-muted-foreground">Acontece todos os meses</p>
-                    </div>
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" variant="destructive" className="w-full rounded-xl py-6 text-lg shadow-lg shadow-destructive/20" disabled={expensePending}>
-                {expensePending && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
-                Registrar Saída
+              <Button
+                className="flex-1 rounded-2xl bg-primary"
+                onClick={handleSaveEdit}
+                disabled={isUpdating}
+              >
+                Salvar
               </Button>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

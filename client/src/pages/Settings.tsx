@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
-import { useAccounts, useUpdateAccountPercentages } from "@/hooks/use-finance";
+import { useAccounts, useUpdateAccountPercentages, useUser } from "@/hooks/use-finance";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Globe } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
+import { api } from "@shared/routes";
 
 export default function Settings() {
+  const { data: user } = useUser();
   const { data: accounts, isLoading } = useAccounts();
   const { mutate: updatePercentages, isPending } =
     useUpdateAccountPercentages();
@@ -15,6 +18,33 @@ export default function Settings() {
   const [localValues, setLocalValues] = useState<
     { id: number; percentage: number }[]
   >([]);
+
+  const [selectedCurrency, setSelectedCurrency] = useState(user?.currency || "BRL");
+  const [isUpdatingCurrency, setIsUpdatingCurrency] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setSelectedCurrency(user.currency);
+    }
+  }, [user]);
+
+  const handleCurrencyChange = async (currency: string) => {
+    setIsUpdatingCurrency(true);
+    try {
+      const res = await fetch(api.user.update.path, {
+        method: api.user.update.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currency }),
+      });
+      if (!res.ok) throw new Error();
+      toast({ title: "Moeda Atualizada", description: `A moeda do sistema agora é ${currency}.` });
+      queryClient.invalidateQueries({ queryKey: [api.user.get.path] });
+    } catch (e) {
+      toast({ title: "Erro", description: "Não foi possível alterar a moeda.", variant: "destructive" });
+    } finally {
+      setIsUpdatingCurrency(false);
+    }
+  };
 
   useEffect(() => {
     if (accounts) {
@@ -89,6 +119,35 @@ export default function Settings() {
           contas.
         </p>
       </div>
+
+      <Card className="p-6 rounded-3xl border-border/50 shadow-sm">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <Globe className="w-5 h-5 text-primary" /> Moeda do Sistema
+        </h3>
+        <p className="text-sm text-muted-foreground mb-6">
+          Escolha a moeda principal para exibição de valores em todo o aplicativo.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { code: "BRL", label: "Real (R$)", flag: "🇧🇷" },
+            { code: "EUR", label: "Euro (€)", flag: "🇪🇺" },
+            { code: "USD", label: "Dólar ($)", flag: "🇺🇸" },
+            { code: "GBP", label: "Libra (£)", flag: "🇬🇧" },
+          ].map((c) => (
+            <Button
+              key={c.code}
+              variant={selectedCurrency === c.code ? "default" : "outline"}
+              className="rounded-2xl h-auto py-4 flex flex-col gap-1 border-2"
+              onClick={() => handleCurrencyChange(c.code)}
+              disabled={isUpdatingCurrency}
+            >
+              <span className="text-2xl">{c.flag}</span>
+              <span className="font-bold">{c.code}</span>
+              <span className="text-[10px] opacity-70">{c.label}</span>
+            </Button>
+          ))}
+        </div>
+      </Card>
 
       <Card className="p-8 rounded-3xl border-border/50 shadow-sm">
         <div

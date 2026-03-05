@@ -45,6 +45,13 @@ export default function Dashboard() {
       ?.filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0) || 0;
 
+  const formatValue = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: user?.currency || "BRL",
+    }).format(value / 100);
+  };
+
   if (loadingAccounts || loadingTransactions) {
     return (
       <div className="space-y-8 animate-pulse">
@@ -77,7 +84,7 @@ export default function Dashboard() {
                   lineHeight: 1.05,
                 }}
               >
-                {formatCurrency(totalBalance, user?.currency)}
+                {formatValue(totalBalance)}
               </h2>
             </div>
 
@@ -101,7 +108,7 @@ export default function Dashboard() {
                   Entradas Mês
                 </p>
                 <p className="font-semibold text-foreground truncate">
-                  + {formatCurrency(totalIncome, user?.currency)}
+                  + {formatValue(totalIncome)}
                 </p>
               </div>
             </div>
@@ -115,7 +122,7 @@ export default function Dashboard() {
                   Saídas Mês
                 </p>
                 <p className="font-semibold text-foreground truncate">
-                  - {formatCurrency(totalExpense, user?.currency)}
+                  - {formatValue(totalExpense)}
                 </p>
               </div>
             </div>
@@ -213,7 +220,7 @@ export default function Dashboard() {
                   Saldo Atual
                 </p>
                 <p className="text-3xl font-display font-bold text-foreground">
-                  {formatCurrency(account.balance, user?.currency)}
+                  {formatValue(account.balance)}
                 </p>
               </div>
 

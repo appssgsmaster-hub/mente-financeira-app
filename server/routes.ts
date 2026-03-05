@@ -48,6 +48,16 @@ export async function registerRoutes(
     res.json(user);
   });
 
+  app.patch(api.user.update.path, async (req, res) => {
+    try {
+      const { currency } = req.body;
+      const updated = await storage.updateUserCurrency(DEMO_USER_ID, currency);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json({ message: (err as Error).message });
+    }
+  });
+
   app.get(api.accounts.list.path, async (req, res) => {
     const userAccounts = await storage.getAccounts(DEMO_USER_ID);
     res.json(userAccounts);

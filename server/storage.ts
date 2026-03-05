@@ -18,6 +18,8 @@ export interface IStorage {
   distributeIncome(userId: number, request: DistributeIncomeRequest): Promise<{ transaction: Transaction; updatedAccounts: Account[] }>;
   deleteTransaction(id: number): Promise<void>;
   updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction>;
+  updateUserCurrency(id: number, currency: string): Promise<User>;
+  resetAllData(userId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -129,6 +131,15 @@ export class DatabaseStorage implements IStorage {
       .set(data)
       .where(eq(transactions.id, id))
       .returning();
+    return updated;
+  }
+
+  async updateUserCurrency(id: number, currency: string): Promise<User> {
+    const [updated] = await db.update(users)
+      .set({ currency })
+      .where(eq(users.id, id))
+      .returning();
+    if (!updated) throw new Error("Usuário não encontrado");
     return updated;
   }
 

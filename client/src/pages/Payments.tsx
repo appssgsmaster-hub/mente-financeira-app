@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowUpRight, Receipt, Pencil, Trash2, PlusCircle, MinusCircle } from "lucide-react";
+import { ArrowUpRight, Receipt, Pencil, Trash2, PlusCircle, Globe } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   useDeleteTransaction,
   useDistributeIncome,
   useCreateTransaction,
+  useUser,
 } from "@/hooks/use-finance";
 
 // --- helpers ---
@@ -30,7 +31,7 @@ function parseMoneyInput(raw: string) {
 function formatCurrency(value: number, currency = "BRL") {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
-    currency,
+    currency: currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value / 100);
@@ -38,6 +39,7 @@ function formatCurrency(value: number, currency = "BRL") {
 
 export default function Payments() {
   const { toast } = useToast();
+  const { data: user } = useUser();
   const { data: accounts } = useAccounts();
   const { data: transactions } = useTransactions();
 
@@ -152,7 +154,7 @@ export default function Payments() {
               onChange={e => setDesc(e.target.value)}
             />
             <input
-              placeholder="Valor R$ (ex: 1.500,00)"
+              placeholder="Valor (ex: 1.500,00)"
               className="w-full p-3 rounded-2xl border border-input bg-background"
               value={amount}
               onChange={e => setAmount(e.target.value)}
@@ -222,7 +224,7 @@ export default function Payments() {
                   </div>
                   <div className="flex items-center gap-6">
                     <p className={`text-xl font-bold ${isIncome ? "text-secondary" : "text-destructive"}`}>
-                      {isIncome ? "+" : "-"} {formatCurrency(tx.amount)}
+                      {isIncome ? "+" : "-"} {formatCurrency(tx.amount, user?.currency)}
                     </p>
                     <div className="flex items-center gap-2">
                       <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => openEdit(tx)}>
@@ -246,7 +248,7 @@ export default function Payments() {
             <h2 className="text-2xl font-display font-bold">Editar Transação</h2>
             <div className="space-y-4">
               <input className="w-full p-3 rounded-2xl border" value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Descrição" />
-              <input className="w-full p-3 rounded-2xl border" value={editAmountRaw} onChange={e => setEditAmountRaw(e.target.value)} placeholder="Valor R$" />
+              <input className="w-full p-3 rounded-2xl border" value={editAmountRaw} onChange={e => setEditAmountRaw(e.target.value)} placeholder="Valor" />
             </div>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1 rounded-2xl" onClick={closeEdit}>Cancelar</Button>

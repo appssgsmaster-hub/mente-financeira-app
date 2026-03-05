@@ -63,6 +63,37 @@ export async function registerRoutes(
     res.json(userAccounts);
   });
 
+  app.post(api.accounts.list.path, async (req, res) => {
+    try {
+      const input = req.body;
+      input.userId = DEMO_USER_ID;
+      const newAccount = await storage.createAccount(input);
+      res.status(201).json(newAccount);
+    } catch (err) {
+      res.status(400).json({ message: "Erro ao criar conta" });
+    }
+  });
+
+  app.patch("/api/accounts/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateAccount(id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(404).json({ message: "Conta não encontrada" });
+    }
+  });
+
+  app.delete("/api/accounts/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteAccount(id);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(404).json({ message: "Conta não encontrada" });
+    }
+  });
+
   app.post(api.accounts.updatePercentages.path, async (req, res) => {
     try {
       const input = api.accounts.updatePercentages.input.parse(req.body);

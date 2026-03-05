@@ -19,6 +19,9 @@ export interface IStorage {
   deleteTransaction(id: number): Promise<void>;
   updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction>;
   updateUserCurrency(id: number, currency: string): Promise<User>;
+  createAccount(account: InsertAccount): Promise<Account>;
+  updateAccount(id: number, data: Partial<Account>): Promise<Account>;
+  deleteAccount(id: number): Promise<void>;
   resetAllData(userId: number): Promise<void>;
 }
 
@@ -141,6 +144,27 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (!updated) throw new Error("Usuário não encontrado");
     return updated;
+  }
+
+  async createAccount(account: InsertAccount): Promise<Account> {
+    const [newAccount] = await db.insert(accounts).values(account).returning();
+    return newAccount;
+  }
+
+  async updateAccount(id: number, data: Partial<Account>): Promise<Account> {
+    const [updated] = await db.update(accounts)
+      .set(data)
+      .where(eq(accounts.id, id))
+      .returning();
+    if (!updated) throw new Error("Conta não encontrada");
+    return updated;
+  }
+
+  async deleteAccount(id: number): Promise<void> {
+    // Reallocate balance to first account or just delete? 
+    // Usually better to delete transactions associated too
+    await db.delete(transactions).where(eq(transactions.accountId, id));
+    await db.delete(accounts).where(eq(accounts.id, id));
   }
 
   async resetAllData(userId: number): Promise<void> {

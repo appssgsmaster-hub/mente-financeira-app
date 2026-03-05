@@ -11,7 +11,8 @@ import {
   X,
   TrendingUp,
   BarChart3,
-  Target
+  Target,
+  Calendar
 } from "lucide-react";
 import { 
   BarChart, 
@@ -116,7 +117,9 @@ export default function Projections() {
   }, [items]);
 
   useEffect(() => {
-    if (accounts?.length && !accountId) setAccountId(accounts[0].id);
+    if (accounts?.length && !accountId) {
+      setAccountId(accounts[0].id);
+    }
   }, [accounts]);
 
   const formatCurrency = (value: number) => {
@@ -144,16 +147,12 @@ export default function Projections() {
   const totalCommitted = commitmentsThisMonth.reduce((sum, c) => sum + c.value, 0);
   const totalBalance = accounts?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
 
-  // Projection Chart Data
   const chartData = useMemo(() => {
     return Array.from({ length: 6 }, (_, i) => {
       const d = new Date();
       d.setMonth(now.getMonth() + i);
       const mIdx = d.getMonth();
       const mName = MONTHS[mIdx];
-      
-      // Basic projection: balance + small growth - commitments
-      // (Simplified for visual impact)
       const growth = (totalBalance / 100) * (1 + 0.01 * i); 
       return { name: mName, valor: Math.max(0, growth) };
     });
@@ -164,7 +163,22 @@ export default function Projections() {
     setAccountId(targetAccountId ?? accounts?.[0]?.id ?? 0);
     setDescription("");
     setValueStr("");
-    setStartDate(ymd(new Date(now.getFullYear(), monthIndex, 1)));
+    setStartDate(ymd(now));
+    setRecurrence("FIXO");
+    setInstallmentsStr("1");
+    setCategory(CATEGORIES[0]);
+    setIsModalOpen(true);
+  }
+
+  function openEdit(c: Commitment) {
+    setEditingId(c.id);
+    setAccountId(c.accountId);
+    setDescription(c.description);
+    setValueStr(String((c.value / 100).toFixed(2)).replace(".", ","));
+    setStartDate(c.startDate);
+    setRecurrence(c.recurrence);
+    setInstallmentsStr(String(c.installments ?? 1));
+    setCategory(c.category);
     setIsModalOpen(true);
   }
 
@@ -197,8 +211,8 @@ export default function Projections() {
           <h1 className="text-4xl font-display font-bold text-foreground">Projeções de Prosperidade</h1>
           <p className="text-muted-foreground mt-2">Visualize o futuro do seu ecossistema financeiro.</p>
         </div>
-        <Button onClick={() => openNew()} className="rounded-2xl gap-2">
-          <Plus className="w-4 h-4" /> Planejar Futuro
+        <Button onClick={() => openNew()} className="rounded-2xl gap-2 h-12 px-6 bg-primary hover:bg-primary/90">
+          <Plus className="w-5 h-5" /> Planejar Futuro
         </Button>
       </div>
 
@@ -236,7 +250,7 @@ export default function Projections() {
               <TrendingUp className="w-5 h-5 text-primary" /> Mentor Prosperidade
             </h3>
             <p className="text-sm text-muted-foreground italic leading-relaxed">
-              "O ecossistema prospera quando cada decisão futura é plantada hoje. Suas projeções mostram um caminho de clareza e liberdade."
+              "O ecossistema prospera quando cada decision futura é plantada hoje. Suas projeções mostram um caminho de clareza e liberdade."
             </p>
           </Card>
         </div>
@@ -264,7 +278,7 @@ export default function Projections() {
 
           return (
             <Card key={acc.id} className="rounded-3xl border border-border shadow-sm overflow-hidden">
-              <div className="p-5 flex items-center justify-between cursor-pointer" onClick={() => setOpenAccountId(isOpen ? null : acc.id)}>
+              <div className="p-5 flex items-center justify-between cursor-pointer hover:bg-muted/5 transition-colors" onClick={() => setOpenAccountId(isOpen ? null : acc.id)}>
                 <div className="flex items-center gap-4">
                   <div className="w-3 h-10 rounded-full" style={{ backgroundColor: acc.color }} />
                   <div>
@@ -274,30 +288,53 @@ export default function Projections() {
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="font-display font-bold text-xl">{formatCurrency(accTotal)}</span>
-                  {isOpen ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                  {isOpen ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
                 </div>
               </div>
               {isOpen && (
-                <div className="px-5 pb-5 space-y-3">
-                  <div className="flex justify-end">
-                    <Button variant="outline" size="sm" className="rounded-xl" onClick={(e) => { e.stopPropagation(); openNew(acc.id); }}>
-                      <Plus className="w-4 h-4 mr-1" /> Adicionar Item
+                <div className="px-5 pb-5 space-y-3 border-t border-border/50 pt-5">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Lista de Compromissos</span>
+                    <Button variant="outline" size="sm" className="rounded-xl h-9 px-4 border-primary/20 hover:border-primary/40 text-primary" onClick={(e) => { e.stopPropagation(); openNew(acc.id); }}>
+                      <Plus className="w-4 h-4 mr-1" /> Adicionar
                     </Button>
                   </div>
-                  {accItems.map((c) => (
-                    <div key={c.id} className="p-4 border rounded-2xl bg-muted/10 flex justify-between items-center">
-                      <div>
-                        <p className="font-bold">{c.description}</p>
-                        <p className="text-xs text-muted-foreground">{c.category} • {c.recurrence === "FIXO" ? "Recorrente" : `${c.installments} parcelas`}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold">{formatCurrency(c.value)}</span>
-                        <Button variant="ghost" size="icon" onClick={() => remove(c.id)} className="text-muted-foreground hover:text-destructive">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                  {accItems.length === 0 ? (
+                    <div className="py-8 text-center border-2 border-dashed border-muted rounded-2xl">
+                      <p className="text-sm text-muted-foreground italic">Nenhum compromisso para este mês.</p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {accItems.map((c) => (
+                        <div key={c.id} className="p-4 border border-border/60 rounded-2xl bg-muted/5 flex justify-between items-center group hover:border-primary/30 transition-all">
+                          <div className="min-w-0">
+                            <p className="font-bold text-foreground truncate">{c.description}</p>
+                            <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+                              <span className="bg-muted px-1.5 py-0.5 rounded-md">{c.category}</span>
+                              <span className="bg-primary/5 text-primary px-1.5 py-0.5 rounded-md">
+                                {c.recurrence === "FIXO" ? "Recorrente" : `${c.installments} parcelas`}
+                              </span>
+                              <span className="bg-muted px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                                <Calendar className="w-2.5 h-2.5" />
+                                {new Date(c.startDate).toLocaleDateString("pt-BR")}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-4">
+                            <span className="font-display font-bold text-lg text-foreground">{formatCurrency(c.value)}</span>
+                            <div className="flex flex-col gap-1">
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(c); }} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-primary">
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove(c.id); }} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
@@ -307,19 +344,73 @@ export default function Projections() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <Card className="relative z-10 w-full max-w-md p-6 rounded-3xl shadow-2xl space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-display font-bold">Novo Planejamento</h2>
-              <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}><X className="w-5 h-5" /></Button>
-            </div>
-            <input className="w-full p-3 rounded-2xl border bg-background" placeholder="Descrição" value={description} onChange={e => setDescription(e.target.value)} />
-            <input className="w-full p-3 rounded-2xl border bg-background" placeholder="Valor" value={valueStr} onChange={e => setValueStr(e.target.value)} />
-            <select className="w-full p-3 rounded-2xl border bg-background" value={category} onChange={e => setCategory(e.target.value)}>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <div className="flex gap-2">
-              <Button className="flex-1 rounded-2xl" onClick={save}>Salvar no Futuro</Button>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
+          <Card className="relative z-10 w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden border-0">
+            <div className="p-8 space-y-8">
+              <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-display font-bold text-foreground">
+                  {editingId ? "Editar Compromisso" : "Planejar Novo Compromisso"}
+                </h2>
+                <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)} className="rounded-full hover:bg-muted w-10 h-10">
+                  <X className="w-6 h-6" />
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Descrição</label>
+                  <input className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium" placeholder="Ex: Rent Office" value={description} onChange={e => setDescription(e.target.value)} />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Valor</label>
+                  <input className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium" placeholder="Ex: 250" value={valueStr} onChange={e => setValueStr(e.target.value)} />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Data de Início</label>
+                  <div className="relative">
+                    <input type="date" className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium appearance-none" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <Calendar className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Categoria</label>
+                  <select className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium appearance-none cursor-pointer" value={category} onChange={e => setCategory(e.target.value)}>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Recorrência</label>
+                  <div className="flex p-1 bg-muted rounded-[20px] h-14">
+                    <button onClick={() => setRecurrence("FIXO")} className={`flex-1 rounded-[16px] text-xs font-bold transition-all ${recurrence === "FIXO" ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`}>FIXO</button>
+                    <button onClick={() => setRecurrence("PARCELADO")} className={`flex-1 rounded-[16px] text-xs font-bold transition-all ${recurrence === "PARCELADO" ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`}>PARCELADO</button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Conta de Débito</label>
+                  <select className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium appearance-none cursor-pointer" value={String(accountId)} onChange={e => setAccountId(Number(e.target.value))}>
+                    {accounts?.map(a => <option key={a.id} value={String(a.id)}>{a.name}</option>)}
+                  </select>
+                </div>
+
+                {recurrence === "PARCELADO" && (
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Número de Parcelas</label>
+                    <input type="number" min="1" className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium" placeholder="Ex: 12" value={installmentsStr} onChange={e => setInstallmentsStr(e.target.value)} />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <Button variant="outline" onClick={() => setIsModalOpen(false)} className="flex-1 h-14 rounded-2xl font-bold border-border hover:bg-muted text-muted-foreground">Cancelar</Button>
+                <Button onClick={save} className="flex-1 h-14 rounded-2xl font-bold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25">
+                  {editingId ? "Salvar Alterações" : "Salvar Plano"}
+                </Button>
+              </div>
             </div>
           </Card>
         </div>

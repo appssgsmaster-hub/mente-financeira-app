@@ -49,6 +49,18 @@ export default function Dashboard() {
       ?.filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0) || 0;
 
+  // Filtrar apenas transações do mês atual para as mensagens dinâmicas
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  
+  const monthlyIncome = transactions
+    ?.filter((t) => t.type === "income" && new Date(t.date).getTime() >= startOfMonth)
+    .reduce((sum, t) => sum + t.amount, 0) || 0;
+
+  const monthlyExpense = transactions
+    ?.filter((t) => t.type === "expense" && new Date(t.date).getTime() >= startOfMonth)
+    .reduce((sum, t) => sum + t.amount, 0) || 0;
+
   const formatValue = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -103,31 +115,40 @@ export default function Dashboard() {
 
           {/* Mensagem de Incentivo Dinâmica */}
           <div className="mt-6 w-full">
-            {totalIncome > totalExpense ? (
+            {monthlyIncome > monthlyExpense ? (
               <div className="flex items-center gap-3 bg-secondary/10 px-4 py-4 rounded-2xl border border-secondary/20">
                 <div className="p-2 bg-secondary/20 rounded-full text-secondary">
                   <TrendingUp className="w-4 h-4" />
                 </div>
                 <p className="text-sm font-medium text-secondary-foreground">
-                  Parabéns! Suas entradas estão superando as saídas. Continue focado na solução!
+                  Neste mês, suas entradas superam as saídas em {formatValue(monthlyIncome - monthlyExpense)}. Prosperidade consciente!
                 </p>
               </div>
-            ) : totalExpense > 0 ? (
+            ) : monthlyExpense > monthlyIncome ? (
               <div className="flex items-center gap-3 bg-destructive/10 px-4 py-4 rounded-2xl border border-destructive/20">
                 <div className="p-2 bg-destructive/20 rounded-full text-destructive">
                   <TrendingDown className="w-4 h-4" />
                 </div>
                 <p className="text-sm font-medium text-destructive-foreground">
-                  Atenção: Suas saídas estão altas. Revise suas contas e priorize o essencial.
+                  Atenção: Suas saídas superam as entradas neste mês. Reavalie seus gastos em {formatValue(monthlyExpense - monthlyIncome)}.
+                </p>
+              </div>
+            ) : monthlyIncome > 0 ? (
+              <div className="flex items-center gap-3 bg-blue-500/10 px-4 py-4 rounded-2xl border border-blue-500/20">
+                <div className="p-2 bg-blue-500/20 rounded-full text-blue-500">
+                  <RefreshCw className="w-4 h-4" />
+                </div>
+                <p className="text-sm font-medium text-blue-700">
+                  Equilíbrio atingido! Suas entradas e saídas estão empatadas este mês.
                 </p>
               </div>
             ) : (
               <div className="flex items-center gap-3 bg-primary/10 px-4 py-4 rounded-2xl border border-primary/20">
                 <div className="p-2 bg-primary/20 rounded-full text-primary">
-                  <ArrowUpRight className="w-4 h-4" />
+                  <PlusCircle className="w-4 h-4" />
                 </div>
                 <p className="text-sm font-medium text-primary-foreground">
-                  Comece registrando suas entradas em "Pagamentos" para ver seu ecossistema prosperar!
+                  Mês iniciado. Registre sua primeira entrada em "Pagamentos" para ver seu ecossistema prosperar!
                 </p>
               </div>
             )}

@@ -153,10 +153,35 @@ export default function Projections() {
       d.setMonth(now.getMonth() + i);
       const mIdx = d.getMonth();
       const mName = MONTHS[mIdx];
-      const growth = (totalBalance / 100) * (1 + 0.01 * i); 
-      return { name: mName, valor: Math.max(0, growth) };
+      
+      const year = d.getFullYear();
+      const msEnd = new Date(year, mIdx + 1, 0).getTime();
+
+      // Somar todos os compromissos que impactam este mês específico da projeção
+      const monthCommitments = items.reduce((sum, c) => {
+        const startDate = new Date(c.startDate);
+        const startT = startDate.getTime();
+        
+        if (c.recurrence === "FIXO") {
+          return startT <= msEnd ? sum + c.value : sum;
+        } else {
+          const n = Math.max(1, Number(c.installments ?? 1));
+          const startMonthTotal = startDate.getFullYear() * 12 + startDate.getMonth();
+          const currentMonthTotal = year * 12 + mIdx;
+          const diff = currentMonthTotal - startMonthTotal;
+          return (diff >= 0 && diff < n && startT <= msEnd) ? sum + c.value : sum;
+        }
+      }, 0);
+
+      // Projeção simples: Saldo Atual - Compromissos do mês
+      const projectedValue = (totalBalance - monthCommitments) / 100;
+      
+      return { 
+        name: mName, 
+        valor: Math.max(0, projectedValue)
+      };
     });
-  }, [totalBalance]);
+  }, [totalBalance, items, now]);
 
   function openNew(targetAccountId?: number) {
     setEditingId(null);

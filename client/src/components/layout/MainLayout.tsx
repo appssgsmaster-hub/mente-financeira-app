@@ -1,8 +1,10 @@
-import { ReactNode } from "react";
+import { ReactNode, useMemo, useState, useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/hooks/use-auth";
-import { Bell, Search, User as UserIcon, LogOut } from "lucide-react";
+import { useAccounts, useTransactions } from "@/hooks/use-finance";
+import { getMentorMessage } from "@/lib/mentor-messages";
+import { Bell, Search, User as UserIcon, LogOut, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -15,6 +17,8 @@ import {
 
 export function MainLayout({ children }: { children: ReactNode }) {
   const { user, isLoading, logout } = useAuth();
+  const { data: accounts } = useAccounts();
+  const { data: transactions } = useTransactions();
 
   const style = {
     "--sidebar-width": "18rem",
@@ -38,6 +42,46 @@ export function MainLayout({ children }: { children: ReactNode }) {
 
   const trialDays = getTrialDaysLeft();
 
+  const mentorMessage = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const totalBalance = accounts?.reduce((s, a) => s + a.balance, 0) || 0;
+    const monthlyIncome = transactions
+      ?.filter(t => t.type === "income" && new Date(t.date).getTime() >= startOfMonth)
+      .reduce((s, t) => s + t.amount, 0) || 0;
+    const monthlyExpense = transactions
+      ?.filter(t => t.type === "expense" && new Date(t.date).getTime() >= startOfMonth)
+      .reduce((s, t) => s + t.amount, 0) || 0;
+
+    let commitmentAlerts = 0;
+    try {
+      if (user?.id) {
+        const raw = localStorage.getItem(`sgs_commitments_v1_user_${user.id}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const nextWeek = new Date();
+          nextWeek.setDate(now.getDate() + 7);
+          const nextWeekStr = nextWeek.toISOString().split('T')[0];
+          commitmentAlerts = parsed.filter((c: any) => c.startDate <= nextWeekStr).length;
+        }
+      }
+    } catch {}
+
+    return getMentorMessage({
+      totalBalance,
+      monthlyIncome,
+      monthlyExpense,
+      transactionCount: transactions?.length || 0,
+      accountCount: accounts?.length || 0,
+      savingsRatio: monthlyIncome > 0 ? (monthlyIncome - monthlyExpense) / monthlyIncome : 0,
+      hasCommitments: commitmentAlerts > 0,
+      alertCount: commitmentAlerts,
+      userName: user?.name?.split(' ')[0] || '',
+      dayOfWeek: now.getDay(),
+      hour: now.getHours(),
+    });
+  }, [accounts, transactions, user?.id, user?.name]);
+
   return (
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full bg-background overflow-hidden">
@@ -55,8 +99,9 @@ export function MainLayout({ children }: { children: ReactNode }) {
                   </h1>
                 )}
                 <div className="flex items-center gap-3">
-                  <p className="text-sm text-muted-foreground hidden sm:block">
-                    Acompanhe seu ecossistema financeiro.
+                  <p className="text-sm text-muted-foreground hidden sm:block max-w-md" data-testid="text-mentor-message">
+                    <Sparkles className="w-3.5 h-3.5 inline-block mr-1.5 text-primary/60 -translate-y-px" />
+                    <span className="italic">{mentorMessage}</span>
                   </p>
                   {trialDays !== null && (
                     <span className="text-xs bg-secondary/10 text-secondary px-2.5 py-0.5 rounded-full font-semibold hidden sm:inline-block" data-testid="text-trial-badge">

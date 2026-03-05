@@ -120,33 +120,28 @@ export default function Settings() {
         </p>
       </div>
 
-      <Card className="p-6 rounded-3xl border-border/50 shadow-sm">
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Globe className="w-5 h-5 text-primary" /> Moeda do Sistema
-        </h3>
-        <p className="text-sm text-muted-foreground mb-6">
-          Escolha a moeda principal para exibição de valores em todo o aplicativo.
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { code: "BRL", label: "Real (R$)", flag: "🇧🇷" },
-            { code: "EUR", label: "Euro (€)", flag: "🇪🇺" },
-            { code: "USD", label: "Dólar ($)", flag: "🇺🇸" },
-            { code: "GBP", label: "Libra (£)", flag: "🇬🇧" },
-          ].map((c) => (
-            <Button
-              key={c.code}
-              variant={selectedCurrency === c.code ? "default" : "outline"}
-              className="rounded-2xl h-auto py-4 flex flex-col gap-1 border-2"
-              onClick={() => handleCurrencyChange(c.code)}
-              disabled={isUpdatingCurrency}
-            >
-              <span className="text-2xl">{c.flag}</span>
-              <span className="font-bold">{c.code}</span>
-              <span className="text-[10px] opacity-70">{c.label}</span>
-            </Button>
-          ))}
+      <Card className="p-6 rounded-3xl border-border/50 shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-full text-primary">
+            <Globe className="w-5 h-5" />
+          </div>
+          <h3 className="font-bold text-foreground">Moeda do Ecossistema</h3>
         </div>
+        
+        <select
+          value={selectedCurrency}
+          onChange={(e) => handleCurrencyChange(e.target.value)}
+          disabled={isUpdatingCurrency}
+          className="bg-white dark:bg-black border border-border/50 rounded-xl px-4 py-2 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer appearance-none min-w-[120px]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='top-0.5 19 9l-7 7-7-7' /%3E%3C/svg%3E")`,
+          }}
+        >
+          <option value="BRL">BRL (R$)</option>
+          <option value="EUR">EUR (€)</option>
+          <option value="USD">USD ($)</option>
+          <option value="GBP">GBP (£)</option>
+        </select>
       </Card>
 
       <Card className="p-8 rounded-3xl border-border/50 shadow-sm">

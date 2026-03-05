@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { useAccounts, useTransactions, useUser } from "@/hooks/use-finance";
 import { formatCurrency } from "@/lib/format";
 import { Card } from "@/components/ui/card";
@@ -12,6 +13,8 @@ import {
   PlusCircle, 
   Download,
   RefreshCw,
+  AlertCircle,
+  Clock
 } from "lucide-react";
 import {
   PieChart,
@@ -48,6 +51,36 @@ export default function Dashboard() {
     transactions
       ?.filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0) || 0;
+
+  // Carregar compromissos do LocalStorage para alertas
+  const [commitments, setCommitments] = useState<any[]>([]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("sgs_commitments_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setCommitments(parsed);
+      }
+    } catch {}
+  }, []);
+
+  const alerts = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const nextWeek = new Date();
+    nextWeek.setDate(now.getDate() + 7);
+    const nextWeekStr = nextWeek.toISOString().split('T')[0];
+
+    return commitments.filter(c => {
+      // Simplificação: alerta se a data de início for no passado (atrasado) ou nos próximos 7 dias (vence logo)
+      // Nota: No mundo real, verificaríamos se já foi pago, mas aqui usamos o planejamento como guia
+      return c.startDate <= nextWeekStr;
+    }).map(c => ({
+      ...c,
+      status: c.startDate < todayStr ? 'atrasado' : 'soon',
+      accountName: accounts?.find(a => a.id === c.accountId)?.name || 'Conta'
+    }));
+  }, [commitments, accounts]);
 
   // Filtrar apenas transações do mês atual para as mensagens dinâmicas
   const now = new Date();
@@ -113,45 +146,83 @@ export default function Dashboard() {
             </Button>
           </div>
 
-          {/* Mensagem de Incentivo Dinâmica */}
-          <div className="mt-6 w-full">
-            {monthlyIncome > monthlyExpense ? (
-              <div className="flex items-center gap-3 bg-secondary/10 px-4 py-4 rounded-2xl border border-secondary/20">
-                <div className="p-2 bg-secondary/20 rounded-full text-secondary">
-                  <TrendingUp className="w-4 h-4" />
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Mensagem de Incentivo Dinâmica */}
+            <div className="w-full">
+              {monthlyIncome > monthlyExpense ? (
+                <div className="h-full flex items-center gap-3 bg-secondary/10 px-4 py-4 rounded-2xl border border-secondary/20">
+                  <div className="p-2 bg-secondary/20 rounded-full text-secondary">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                  <p className="text-sm font-medium text-secondary-foreground">
+                    Neste mês, suas entradas superam as saídas em {formatValue(monthlyIncome - monthlyExpense)}. Prosperidade consciente!
+                  </p>
                 </div>
-                <p className="text-sm font-medium text-secondary-foreground">
-                  Neste mês, suas entradas superam as saídas em {formatValue(monthlyIncome - monthlyExpense)}. Prosperidade consciente!
-                </p>
-              </div>
-            ) : monthlyExpense > monthlyIncome ? (
-              <div className="flex items-center gap-3 bg-destructive/10 px-4 py-4 rounded-2xl border border-destructive/20">
-                <div className="p-2 bg-destructive/20 rounded-full text-destructive">
-                  <TrendingDown className="w-4 h-4" />
+              ) : monthlyExpense > monthlyIncome ? (
+                <div className="h-full flex items-center gap-3 bg-destructive/10 px-4 py-4 rounded-2xl border border-destructive/20">
+                  <div className="p-2 bg-destructive/20 rounded-full text-destructive">
+                    <TrendingDown className="w-4 h-4" />
+                  </div>
+                  <p className="text-sm font-medium text-destructive-foreground">
+                    Atenção: Suas saídas superam as entradas neste mês. Reavalie seus gastos em {formatValue(monthlyExpense - monthlyIncome)}.
+                  </p>
                 </div>
-                <p className="text-sm font-medium text-destructive-foreground">
-                  Atenção: Suas saídas superam as entradas neste mês. Reavalie seus gastos em {formatValue(monthlyExpense - monthlyIncome)}.
-                </p>
-              </div>
-            ) : monthlyIncome > 0 ? (
-              <div className="flex items-center gap-3 bg-blue-500/10 px-4 py-4 rounded-2xl border border-blue-500/20">
-                <div className="p-2 bg-blue-500/20 rounded-full text-blue-500">
-                  <RefreshCw className="w-4 h-4" />
+              ) : monthlyIncome > 0 ? (
+                <div className="h-full flex items-center gap-3 bg-blue-500/10 px-4 py-4 rounded-2xl border border-blue-500/20">
+                  <div className="p-2 bg-blue-500/20 rounded-full text-blue-500">
+                    <RefreshCw className="w-4 h-4" />
+                  </div>
+                  <p className="text-sm font-medium text-blue-700">
+                    Equilíbrio atingido! Suas entradas e saídas estão empatadas este mês.
+                  </p>
                 </div>
-                <p className="text-sm font-medium text-blue-700">
-                  Equilíbrio atingido! Suas entradas e saídas estão empatadas este mês.
-                </p>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 bg-primary/10 px-4 py-4 rounded-2xl border border-primary/20">
-                <div className="p-2 bg-primary/20 rounded-full text-primary">
-                  <PlusCircle className="w-4 h-4" />
+              ) : (
+                <div className="h-full flex items-center gap-3 bg-primary/10 px-4 py-4 rounded-2xl border border-primary/20">
+                  <div className="p-2 bg-primary/20 rounded-full text-primary">
+                    <PlusCircle className="w-4 h-4" />
+                  </div>
+                  <p className="text-sm font-medium text-primary-foreground">
+                    Mês iniciado. Registre sua primeira entrada em "Pagamentos" para ver seu ecossistema prosperar!
+                  </p>
                 </div>
-                <p className="text-sm font-medium text-primary-foreground">
-                  Mês iniciado. Registre sua primeira entrada em "Pagamentos" para ver seu ecossistema prosperar!
-                </p>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Card de Alertas/Compromissos */}
+            <div className="w-full">
+              {alerts.length > 0 ? (
+                <div className="h-full bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
+                    <AlertCircle className="w-4 h-4" /> Alertas do Ecossistema
+                  </div>
+                  <div className="space-y-2 max-h-[80px] overflow-y-auto pr-1 custom-scrollbar">
+                    {alerts.slice(0, 2).map((alert, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-bold truncate">{alert.description}</p>
+                          <p className="text-[10px] text-muted-foreground opacity-80">{alert.accountName}</p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full font-bold whitespace-nowrap ${alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
+                          {alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
+                        </span>
+                      </div>
+                    ))}
+                    {alerts.length > 2 && (
+                      <p className="text-[10px] text-center text-muted-foreground italic">+{alerts.length - 2} outros avisos</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex items-center gap-3 bg-muted/30 px-4 py-4 rounded-2xl border border-border/50">
+                  <div className="p-2 bg-muted rounded-full text-muted-foreground">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Nenhum compromisso urgente planejado para esta semana. Tudo sob controle!
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </Card>
 

@@ -146,57 +146,16 @@ export default function Dashboard() {
             </Button>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Mensagem de Incentivo Dinâmica */}
-            <div className="w-full flex">
-              {monthlyIncome > monthlyExpense ? (
-                <div className="w-full flex items-center gap-3 bg-secondary/10 px-4 py-4 rounded-2xl border border-secondary/20 min-h-[110px]">
-                  <div className="p-2 bg-secondary/20 rounded-full text-secondary shrink-0">
-                    <TrendingUp className="w-4 h-4" />
-                  </div>
-                  <p className="text-sm font-medium text-secondary-foreground leading-snug">
-                    Neste mês, suas entradas superam as saídas em {formatValue(monthlyIncome - monthlyExpense)}. Prosperidade consciente!
-                  </p>
-                </div>
-              ) : monthlyExpense > monthlyIncome ? (
-                <div className="w-full flex items-center gap-3 bg-destructive/10 px-4 py-4 rounded-2xl border border-destructive/20 min-h-[110px]">
-                  <div className="p-2 bg-destructive/20 rounded-full text-destructive shrink-0">
-                    <TrendingDown className="w-4 h-4" />
-                  </div>
-                  <p className="text-sm font-medium text-destructive-foreground leading-snug">
-                    Atenção: Suas saídas superam as entradas neste mês. Reavalie seus gastos em {formatValue(monthlyExpense - monthlyIncome)}.
-                  </p>
-                </div>
-              ) : monthlyIncome > 0 ? (
-                <div className="w-full flex items-center gap-3 bg-blue-500/10 px-4 py-4 rounded-2xl border border-blue-500/20 min-h-[110px]">
-                  <div className="p-2 bg-blue-500/20 rounded-full text-blue-500 shrink-0">
-                    <RefreshCw className="w-4 h-4" />
-                  </div>
-                  <p className="text-sm font-medium text-blue-700 leading-snug">
-                    Equilíbrio atingido! Suas entradas e saídas estão empatadas este mês.
-                  </p>
-                </div>
-              ) : (
-                <div className="w-full flex items-center gap-3 bg-primary/10 px-4 py-4 rounded-2xl border border-primary/20 min-h-[110px]">
-                  <div className="p-2 bg-primary/20 rounded-full text-primary shrink-0">
-                    <PlusCircle className="w-4 h-4" />
-                  </div>
-                  <p className="text-sm font-medium text-primary-foreground leading-snug">
-                    Mês iniciado. Registre sua primeira entrada em "Pagamentos" para ver seu ecossistema prosperar!
-                  </p>
-                </div>
-              )}
-            </div>
-
+          <div className="mt-6">
             {/* Card de Alertas/Compromissos */}
-            <div className="w-full flex">
+            <div className="w-full">
               {alerts.length > 0 ? (
-                <div className="w-full bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 space-y-3 min-h-[110px]">
+                <div className="w-full bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 space-y-3 min-h-[100px]">
                   <div className="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
-                    <AlertCircle className="w-4 h-4 shrink-0" /> Alertas
+                    <AlertCircle className="w-4 h-4 shrink-0" /> Alertas do Ecossistema
                   </div>
                   <div className="space-y-3 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
-                    {alerts.slice(0, 2).map((alert, i) => (
+                    {alerts.slice(0, 3).map((alert, i) => (
                       <div key={i} className="flex flex-col gap-1 text-xs border-b border-orange-500/10 pb-2 last:border-0 last:pb-0">
                         <div className="flex justify-between items-start gap-2">
                           <p className="font-bold truncate text-foreground">{alert.description}</p>
@@ -210,18 +169,18 @@ export default function Dashboard() {
                         </div>
                       </div>
                     ))}
-                    {alerts.length > 2 && (
-                      <p className="text-[10px] text-center text-muted-foreground italic">+{alerts.length - 2} outros avisos</p>
+                    {alerts.length > 3 && (
+                      <p className="text-[10px] text-center text-muted-foreground italic">+{alerts.length - 3} outros avisos</p>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="h-full flex items-center gap-3 bg-muted/30 px-4 py-4 rounded-2xl border border-border/50">
+                <div className="w-full flex items-center gap-3 bg-muted/30 px-4 py-4 rounded-2xl border border-border/50 min-h-[80px]">
                   <div className="p-2 bg-muted rounded-full text-muted-foreground">
                     <Clock className="w-4 h-4" />
                   </div>
                   <p className="text-xs font-medium text-muted-foreground">
-                    Nenhum compromisso urgente planejado para esta semana. Tudo sob controle!
+                    Nenhum compromisso urgente planejado. Seu ecossistema está em dia!
                   </p>
                 </div>
               )}

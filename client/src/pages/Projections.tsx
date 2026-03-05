@@ -240,13 +240,13 @@ export default function Projections() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
         <div>
-          <h1 className="text-4xl font-display font-bold text-foreground">Projeções de Prosperidade</h1>
-          <p className="text-muted-foreground mt-2">Visualize o futuro do seu ecossistema financeiro.</p>
+          <h1 className="text-2xl sm:text-4xl font-display font-bold text-foreground">Projeções de Prosperidade</h1>
+          <p className="text-xs sm:text-base text-muted-foreground mt-1 sm:mt-2">Visualize o futuro do seu ecossistema financeiro.</p>
         </div>
-        <Button onClick={() => openNew()} className="rounded-2xl gap-2 h-12 px-6 bg-primary hover:bg-primary/90">
-          <Plus className="w-5 h-5" /> Planejar Futuro
+        <Button onClick={() => openNew()} className="rounded-2xl gap-2 h-10 sm:h-12 px-4 sm:px-6 bg-primary hover:bg-primary/90 text-sm sm:text-base w-full sm:w-auto shrink-0">
+          <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> Planejar Futuro
         </Button>
       </div>
 
@@ -385,14 +385,14 @@ export default function Projections() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <Card className="relative z-10 w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden border-0">
-            <div className="p-8 space-y-8">
-              <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-display font-bold text-foreground">
+          <Card className="relative z-10 w-full max-w-2xl rounded-2xl sm:rounded-[32px] shadow-2xl overflow-hidden border-0 max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-8 space-y-4 sm:space-y-8">
+              <div className="flex justify-between items-center gap-2">
+                <h2 className="text-xl sm:text-3xl font-display font-bold text-foreground">
                   {editingId ? "Editar Compromisso" : "Planejar Novo Compromisso"}
                 </h2>
-                <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)} className="rounded-full hover:bg-muted w-10 h-10">
-                  <X className="w-6 h-6" />
+                <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)} className="rounded-full hover:bg-muted w-8 h-8 sm:w-10 sm:h-10 shrink-0">
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
                 </Button>
               </div>
 
@@ -445,9 +445,9 @@ export default function Projections() {
                 )}
               </div>
 
-              <div className="flex gap-4 pt-4">
-                <Button variant="outline" onClick={() => setIsModalOpen(false)} className="flex-1 h-14 rounded-2xl font-bold border-border hover:bg-muted text-muted-foreground">Cancelar</Button>
-                <Button onClick={save} className="flex-1 h-14 rounded-2xl font-bold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 pt-2 sm:pt-4">
+                <Button variant="outline" onClick={() => setIsModalOpen(false)} className="flex-1 h-11 sm:h-14 rounded-2xl font-bold border-border hover:bg-muted text-muted-foreground text-sm sm:text-base">Cancelar</Button>
+                <Button onClick={save} className="flex-1 h-11 sm:h-14 rounded-2xl font-bold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25 text-sm sm:text-base">
                   {editingId ? "Salvar Alterações" : "Salvar Plano"}
                 </Button>
               </div>

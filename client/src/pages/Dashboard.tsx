@@ -122,17 +122,17 @@ export default function Dashboard() {
       {/* Top Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ECOSSISTEMA TOTAL */}
-        <Card className="p-8 rounded-3xl shadow-xl border-0 bg-white dark:bg-card overflow-hidden relative">
-          <div className="flex items-start justify-between gap-4">
+        <Card className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-xl border-0 bg-white dark:bg-card overflow-hidden relative">
+          <div className="flex items-start justify-between gap-2 sm:gap-4">
             <div className="min-w-0">
-              <p className="text-sm uppercase tracking-wider text-muted-foreground mb-2">
+              <p className="text-xs sm:text-sm uppercase tracking-wider text-muted-foreground mb-1 sm:mb-2">
                 Ecossistema Total
               </p>
 
               <h2
                 className="font-display font-bold text-foreground tracking-tight"
                 style={{
-                  fontSize: "clamp(28px, 3.2vw, 44px)",
+                  fontSize: "clamp(22px, 3.2vw, 44px)",
                   lineHeight: 1.05,
                 }}
               >
@@ -142,10 +142,12 @@ export default function Dashboard() {
 
             <Button
               variant="outline"
-              className="rounded-full bg-white/60 dark:bg-black/40 backdrop-blur-sm border-white/20 shadow-sm"
+              size="sm"
+              className="rounded-full bg-white/60 dark:bg-black/40 backdrop-blur-sm border-white/20 shadow-sm text-xs sm:text-sm shrink-0"
             >
-              <Download className="w-4 h-4 mr-2" />
-              Exportar PDF
+              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Exportar PDF</span>
+              <span className="sm:hidden">PDF</span>
             </Button>
           </div>
 
@@ -256,9 +258,9 @@ export default function Dashboard() {
                 style={{ backgroundColor: account.color || "var(--primary)" }}
               />
 
-              <div className="flex items-start justify-between mb-6 mt-2">
-                <div>
-                  <h4 className="font-medium text-foreground text-lg mb-1">
+              <div className="flex items-start justify-between mb-4 sm:mb-6 mt-2">
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-medium text-foreground text-sm sm:text-lg mb-1 truncate">
                     {account.name}
                   </h4>
                   <div className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
@@ -267,21 +269,21 @@ export default function Dashboard() {
                 </div>
 
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ml-2"
                   style={{
                     backgroundColor: `${account.color || "#4F46E5"}20`,
                     color: account.color || "#4F46E5",
                   }}
                 >
-                  <RefreshCw className="w-5 h-5" />
+                  <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
               </div>
 
               <div>
-                <p className="text-sm text-muted-foreground mb-1">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">
                   Saldo Atual
                 </p>
-                <p className="text-3xl font-display font-bold text-foreground">
+                <p className="text-xl sm:text-3xl font-display font-bold text-foreground">
                   {formatValue(account.balance)}
                 </p>
               </div>

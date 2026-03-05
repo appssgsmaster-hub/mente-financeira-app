@@ -134,11 +134,11 @@ export default function Plans() {
         </Card>
       )}
 
-      <div className="text-center mt-12">
-        <h1 className="text-4xl font-display font-bold text-foreground mb-4" data-testid="text-plans-title">
+      <div className="text-center mt-8 sm:mt-12">
+        <h1 className="text-2xl sm:text-4xl font-display font-bold text-foreground mb-2 sm:mb-4" data-testid="text-plans-title">
           {isActive ? "Seu Plano" : "Escolha sua Trajetória"}
         </h1>
-        <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+        <p className="text-sm sm:text-lg text-muted-foreground max-w-xl mx-auto px-2">
           {isActive
             ? "Obrigado por confiar no SGS Group para sua jornada financeira."
             : "Sua Mente Financeira pode ir muito além. Desbloqueie o poder completo do ecossistema SGS Group."
@@ -146,13 +146,13 @@ export default function Plans() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-center">
-        <Card className="p-8 rounded-3xl border-border/50 bg-card">
-          <div className="mb-8">
-            <h3 className="text-2xl font-bold font-display text-foreground">Teste Gratuito</h3>
-            <p className="text-muted-foreground mt-2">15 dias para explorar</p>
-            <div className="mt-6 font-display">
-              <span className="text-4xl font-bold text-foreground">R$ 0</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto items-center">
+        <Card className="p-5 sm:p-8 rounded-2xl sm:rounded-3xl border-border/50 bg-card">
+          <div className="mb-6 sm:mb-8">
+            <h3 className="text-xl sm:text-2xl font-bold font-display text-foreground">Teste Gratuito</h3>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">15 dias para explorar</p>
+            <div className="mt-4 sm:mt-6 font-display">
+              <span className="text-3xl sm:text-4xl font-bold text-foreground">R$ 0</span>
               <span className="text-muted-foreground ml-2">/15 dias</span>
             </div>
           </div>
@@ -173,15 +173,15 @@ export default function Plans() {
           </Button>
         </Card>
 
-        <Card className="p-10 rounded-[2.5rem] border-primary shadow-2xl shadow-primary/20 bg-gradient-to-b from-card to-primary/5 relative scale-105 z-10">
-          <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-bold tracking-wide flex items-center gap-2">
-            <Star className="w-4 h-4" /> RECOMENDADO
+        <Card className="p-6 sm:p-10 rounded-2xl sm:rounded-[2.5rem] border-primary shadow-2xl shadow-primary/20 bg-gradient-to-b from-card to-primary/5 relative sm:scale-105 z-10">
+          <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5 sm:gap-2">
+            <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> RECOMENDADO
           </div>
-          <div className="mb-8">
-            <h3 className="text-3xl font-bold font-display text-foreground">Premium SGS</h3>
-            <p className="text-muted-foreground mt-2">O controle absoluto do seu dinheiro</p>
-            <div className="mt-6 font-display flex items-end gap-2">
-              <span className="text-5xl font-bold text-primary">R$ 49</span>
+          <div className="mb-6 sm:mb-8 mt-2 sm:mt-0">
+            <h3 className="text-2xl sm:text-3xl font-bold font-display text-foreground">Premium SGS</h3>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">O controle absoluto do seu dinheiro</p>
+            <div className="mt-4 sm:mt-6 font-display flex items-end gap-2">
+              <span className="text-4xl sm:text-5xl font-bold text-primary">R$ 49</span>
               <span className="text-muted-foreground mb-1">/mês</span>
             </div>
           </div>

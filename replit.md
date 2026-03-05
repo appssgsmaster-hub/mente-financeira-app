@@ -16,9 +16,12 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - Stripe subscription billing (R$ 49/mês Premium plan)
 - 6 accounts financial method with configurable percentages
 - Income distribution across accounts by percentage
-- Transaction tracking (income/expense)
+- Transaction tracking (income/expense) with custom date picker
 - Projection system with commitments (localStorage-based)
 - Dashboard with alerts and motivational messages
+- AI Mentor: dynamic motivational messages based on financial context
+- PWA (Progressive Web App): installable on mobile/desktop, offline-capable
+- Fully mobile-responsive layout across all pages
 
 ## Database Schema
 - `users`: id (serial), name, email, passwordHash, currency, trialStartDate, trialEndDate, stripeCustomerId, stripeSubscriptionId, subscriptionStatus, createdAt

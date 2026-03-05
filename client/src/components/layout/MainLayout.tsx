@@ -87,40 +87,40 @@ export function MainLayout({ children }: { children: ReactNode }) {
       <div className="flex h-screen w-full bg-background overflow-hidden">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-border/40 bg-background/80 backdrop-blur-md z-10">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger className="lg:hidden text-muted-foreground hover:text-foreground" />
-              <div>
+          <header className="min-h-[3.5rem] sm:h-20 flex items-center justify-between px-3 sm:px-6 lg:px-10 border-b border-border/40 bg-background/80 backdrop-blur-md z-10 py-2 sm:py-0">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+              <SidebarTrigger className="lg:hidden text-muted-foreground hover:text-foreground shrink-0" />
+              <div className="min-w-0">
                 {isLoading ? (
-                  <Skeleton className="h-8 w-48 rounded-md" />
+                  <Skeleton className="h-6 sm:h-8 w-36 sm:w-48 rounded-md" />
                 ) : (
-                  <h1 className="text-2xl font-display font-semibold text-foreground">
+                  <h1 className="text-base sm:text-2xl font-display font-semibold text-foreground truncate">
                     {getGreeting()}, <span className="text-primary italic">{user?.name?.split(' ')[0] || 'Prosperidade'}!</span>
                   </h1>
                 )}
-                <div className="flex items-center gap-3">
-                  <p className="text-sm text-muted-foreground hidden sm:block max-w-md" data-testid="text-mentor-message">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block max-w-md" data-testid="text-mentor-message">
                     <Sparkles className="w-3.5 h-3.5 inline-block mr-1.5 text-primary/60 -translate-y-px" />
                     <span className="italic">{mentorMessage}</span>
                   </p>
                   {trialDays !== null && (
-                    <span className="text-xs bg-secondary/10 text-secondary px-2.5 py-0.5 rounded-full font-semibold hidden sm:inline-block" data-testid="text-trial-badge">
-                      {trialDays} {trialDays === 1 ? 'dia' : 'dias'} de teste
+                    <span className="text-[10px] sm:text-xs bg-secondary/10 text-secondary px-2 sm:px-2.5 py-0.5 rounded-full font-semibold" data-testid="text-trial-badge">
+                      {trialDays}d teste
                     </span>
                   )}
                 </div>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10">
-                <Search className="w-5 h-5" />
+            <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+              <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 h-8 w-8 sm:h-10 sm:w-10">
+                <Search className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 relative">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-secondary rounded-full border-2 border-background"></span>
+              <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 relative h-8 w-8 sm:h-10 sm:w-10">
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="absolute top-1 right-1 sm:top-2 sm:right-2 w-2 h-2 bg-secondary rounded-full border-2 border-background"></span>
               </Button>
-              <div className="w-px h-8 bg-border/50 mx-2 hidden sm:block"></div>
+              <div className="w-px h-8 bg-border/50 mx-1 sm:mx-2 hidden sm:block"></div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="rounded-full gap-2 hidden sm:flex border-border/50 hover:bg-accent" data-testid="button-user-menu">
@@ -147,7 +147,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
             </div>
           </header>
           
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 lg:p-10 relative">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6 lg:p-10 relative">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-50 pointer-events-none -z-10" />
             <div className="max-w-7xl mx-auto h-full">
               {children}

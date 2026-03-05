@@ -136,8 +136,8 @@ export default function Payments() {
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-4xl font-display font-bold text-foreground">Pagamentos e Entradas</h1>
-          <p className="text-muted-foreground mt-2">Gerencie seu fluxo de caixa e o ecossistema financeiro.</p>
+          <h1 className="text-2xl sm:text-4xl font-display font-bold text-foreground">Pagamentos e Entradas</h1>
+          <p className="text-xs sm:text-base text-muted-foreground mt-1 sm:mt-2">Gerencie seu fluxo de caixa e o ecossistema financeiro.</p>
         </div>
       </div>
 
@@ -179,16 +179,16 @@ export default function Payments() {
               <option value="">Selecione a conta (apenas para Saídas)</option>
               {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <Button 
-                className="flex-1 rounded-2xl bg-secondary hover:bg-secondary/90 text-white"
+                className="flex-1 rounded-2xl bg-secondary hover:bg-secondary/90 text-white text-sm sm:text-base py-2.5 sm:py-3"
                 onClick={handleAddIncome}
                 disabled={isDistributing}
               >
                 Registrar Entrada
               </Button>
               <Button 
-                className="flex-1 rounded-2xl bg-destructive hover:bg-destructive/90 text-white"
+                className="flex-1 rounded-2xl bg-destructive hover:bg-destructive/90 text-white text-sm sm:text-base py-2.5 sm:py-3"
                 onClick={handleAddExpense}
                 disabled={isCreatingExpense}
               >
@@ -221,29 +221,29 @@ export default function Payments() {
               const isIncome = tx.type === "income";
               const accountName = tx.accountId != null ? accountsById.get(tx.accountId)?.name : "Ecossistema (Distribuído)";
               return (
-                <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-5">
-                    <div className={`p-4 rounded-2xl ${isIncome ? "bg-secondary/10 text-secondary" : "bg-destructive/10 text-destructive"}`}>
-                      {isIncome ? <ArrowUpRight className="w-6 h-6" /> : <Receipt className="w-6 h-6" />}
+                <div key={tx.id} className="p-3 sm:p-6 flex items-center justify-between hover:bg-muted/30 transition-colors gap-2 sm:gap-4">
+                  <div className="flex items-center gap-2 sm:gap-5 min-w-0 flex-1">
+                    <div className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl shrink-0 ${isIncome ? "bg-secondary/10 text-secondary" : "bg-destructive/10 text-destructive"}`}>
+                      {isIncome ? <ArrowUpRight className="w-4 h-4 sm:w-6 sm:h-6" /> : <Receipt className="w-4 h-4 sm:w-6 sm:h-6" />}
                     </div>
-                    <div>
-                      <p className="font-bold text-foreground text-lg">{tx.description}</p>
-                      <div className="flex flex-col gap-1 mt-1">
-                        <p className="text-sm text-muted-foreground">{format(new Date(tx.date), "dd/MM/yyyy", { locale: ptBR })}</p>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{accountName}</p>
+                    <div className="min-w-0">
+                      <p className="font-bold text-foreground text-sm sm:text-lg truncate">{tx.description}</p>
+                      <div className="flex flex-col gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
+                        <p className="text-xs sm:text-sm text-muted-foreground">{format(new Date(tx.date), "dd/MM/yyyy", { locale: ptBR })}</p>
+                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">{accountName}</p>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6">
-                    <p className={`text-xl font-bold ${isIncome ? "text-secondary" : "text-destructive"}`}>
+                  <div className="flex items-center gap-1 sm:gap-6 shrink-0">
+                    <p className={`text-sm sm:text-xl font-bold whitespace-nowrap ${isIncome ? "text-secondary" : "text-destructive"}`}>
                       {isIncome ? "+" : "-"} {formatCurrency(tx.amount, user?.currency)}
                     </p>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => openEdit(tx)}>
-                        <Pencil className="w-5 h-5 text-muted-foreground" />
+                    <div className="flex items-center gap-0 sm:gap-2">
+                      <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-10 sm:w-10" onClick={() => openEdit(tx)}>
+                        <Pencil className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-muted-foreground" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="rounded-xl hover:text-destructive" onClick={() => handleDelete(tx.id)} disabled={isDeleting}>
-                        <Trash2 className="w-5 h-5" />
+                      <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-10 sm:w-10 hover:text-destructive" onClick={() => handleDelete(tx.id)} disabled={isDeleting}>
+                        <Trash2 className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                       </Button>
                     </div>
                   </div>

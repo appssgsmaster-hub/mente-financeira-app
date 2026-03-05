@@ -34,8 +34,8 @@ export function AppSidebar() {
     <Sidebar variant="inset" className="border-r border-border/50 bg-sidebar/50 backdrop-blur-xl">
       <SidebarContent className="pt-6">
         <div className="px-6 mb-8">
-          <h2 className="text-2xl font-bold font-display tracking-tight text-primary">SGS Group</h2>
-          <p className="text-xs text-muted-foreground mt-1 tracking-wider uppercase">Mente Financeira</p>
+          <h2 className="text-xl font-bold font-display tracking-tight text-primary leading-tight">Mente Financeira</h2>
+          <p className="text-[10px] text-muted-foreground mt-0.5 tracking-wider uppercase font-medium">Prosperar é Viver</p>
         </div>
         
         <SidebarGroup>
@@ -53,10 +53,10 @@ export function AppSidebar() {
                         h-11 px-4 rounded-xl transition-all duration-300
                         ${isActive 
                           ? isHighlight
-                            ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-white shadow-md shadow-amber-500/30 hover:from-amber-600 hover:to-yellow-500 hover:text-white'
+                            ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-md shadow-emerald-500/25 hover:from-emerald-700 hover:to-emerald-600 hover:text-white'
                             : 'bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90 hover:text-primary-foreground' 
                           : isHighlight
-                            ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-300'
+                            ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-700 dark:hover:text-emerald-300'
                             : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
                         }
                       `}
@@ -75,15 +75,15 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-6">
-        <div className="relative overflow-hidden rounded-2xl p-4 text-center border border-amber-300/40 dark:border-amber-500/30 bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100/80 dark:from-amber-950/40 dark:via-yellow-950/30 dark:to-amber-900/20 shadow-sm">
-          <div className="absolute top-1 right-2 text-amber-400/60 dark:text-amber-400/40 animate-pulse">
+        <div className="relative overflow-hidden rounded-2xl p-4 text-center border border-primary/20 dark:border-primary/30 bg-gradient-to-br from-primary/5 via-blue-50/50 to-primary/10 dark:from-primary/10 dark:via-blue-950/20 dark:to-primary/5 shadow-sm">
+          <div className="absolute top-1 right-2 text-primary/30 dark:text-primary/25 animate-pulse">
             <Sparkles className="w-4 h-4" />
           </div>
-          <div className="absolute bottom-1 left-2 text-amber-300/40 dark:text-amber-500/30">
+          <div className="absolute bottom-1 left-2 text-primary/20 dark:text-primary/15">
             <Sparkles className="w-3 h-3" />
           </div>
-          <p className="text-xs uppercase tracking-widest font-semibold mb-1 text-amber-700 dark:text-amber-400" data-testid="text-mission-label">Missão SGS Group</p>
-          <p className="text-sm font-display italic text-amber-900 dark:text-amber-200" data-testid="text-mission-quote">"Foco na Solução"</p>
+          <p className="text-xs uppercase tracking-widest font-semibold mb-1 text-primary/70 dark:text-primary/60" data-testid="text-mission-label">Missão SGS Group</p>
+          <p className="text-sm font-display italic text-primary dark:text-primary/80" data-testid="text-mission-quote">"Foco na Solução"</p>
         </div>
       </SidebarFooter>
     </Sidebar>

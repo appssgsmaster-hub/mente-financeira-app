@@ -269,7 +269,7 @@ export async function registerRoutes(
       if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
 
       const stripe = await getUncachableStripeClient();
-      const { priceId } = req.body;
+      const { priceId, mode } = req.body;
 
       let customerId = user.stripeCustomerId;
       if (!customerId) {
@@ -283,17 +283,26 @@ export async function registerRoutes(
       }
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const session = await stripe.checkout.sessions.create({
+      const checkoutMode = mode === 'payment' ? 'payment' : 'subscription';
+
+      const sessionConfig: any = {
         customer: customerId,
         payment_method_types: ['card'],
         line_items: [{ price: priceId, quantity: 1 }],
-        mode: 'subscription',
-        success_url: `${baseUrl}/planos?status=success`,
+        mode: checkoutMode,
+        success_url: checkoutMode === 'payment'
+          ? `${baseUrl}/mentoria/boas-vindas?status=success`
+          : `${baseUrl}/planos?status=success`,
         cancel_url: `${baseUrl}/planos?status=cancel`,
-        subscription_data: {
-          trial_period_days: user.subscriptionStatus === 'trial' || user.subscriptionStatus === 'trial_expired' ? undefined : undefined,
-        },
-      });
+      };
+
+      if (checkoutMode === 'payment') {
+        sessionConfig.payment_intent_data = {
+          metadata: { userId: String(user.id), type: 'mentoria' },
+        };
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionConfig);
 
       res.json({ url: session.url });
     } catch (err) {

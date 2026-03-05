@@ -13,7 +13,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 ## Key Features
 - Multi-user authentication (register/login with email+password)
 - 15-day free trial for new users
-- Stripe subscription billing (R$ 49/mês Premium plan)
+- Stripe billing: Premium (€49,97/mês subscription) + Mentoria Premium (€197,97 one-time)
 - 6 accounts financial method with configurable percentages
 - Income distribution across accounts by percentage
 - Transaction tracking (income/expense) with custom date picker
@@ -34,7 +34,8 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - Commitments (projections) stored in `localStorage` key `sgs_commitments_v1`
 - Session secret from `SESSION_SECRET` env var
 - Stripe connector: `connection:conn_stripe_01KJYXD88BBD71F7JEDMHSGHJ1`
-- Stripe product: "Mente Financeira Premium" with monthly (R$49) and yearly (R$470) prices
+- Stripe products: "Mente Financeira Premium" (€49,97/mês EUR), "Mentoria Premium SGS" (€197,97 one-time EUR)
+- Default currency: EUR (Ireland/Europe focus)
 
 ## File Structure
 - `shared/schema.ts` — Database schema, Zod schemas, types
@@ -50,6 +51,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - `client/src/hooks/use-finance.ts` — Financial data hooks
 - `client/src/pages/AuthPage.tsx` — Login/Register page
 - `client/src/pages/Dashboard.tsx` — Main dashboard
-- `client/src/pages/Plans.tsx` — Subscription plans with Stripe checkout
+- `client/src/pages/Plans.tsx` — Subscription plans with Stripe checkout (3 tiers)
+- `client/src/pages/MentoriaWelcome.tsx` — Post-purchase mentoring welcome page
 - `client/src/components/layout/MainLayout.tsx` — App layout with user menu
 - `client/src/components/layout/AppSidebar.tsx` — Navigation sidebar

@@ -62,25 +62,7 @@ export default function Plans() {
   async function handleCheckout(tier: string) {
     setLoading(tier);
     try {
-      const productsRes = await fetch("/api/stripe/products", { credentials: "include" });
-      const products = await productsRes.json();
-
-      const productNameMap: Record<string, string> = {
-        app: "Mente Financeira App",
-        method: "Método Mente Financeira",
-        mentoria: "Mentoria Transformação Financeira",
-      };
-
-      const product = products.find((p: any) => p.name === productNameMap[tier]);
-      const price = product?.prices?.find((p: any) => p.currency === "eur" && p.active !== false);
-
-      if (!price) {
-        toast({ title: "Erro", description: "Produto não encontrado", variant: "destructive" });
-        return;
-      }
-
       const res = await apiRequest("POST", "/api/stripe/create-checkout", {
-        priceId: price.id,
         planTier: tier,
       });
       const data = await res.json();

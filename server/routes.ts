@@ -263,13 +263,24 @@ export async function registerRoutes(
     }
   });
 
+  const TIER_TO_PRICE: Record<string, string> = {
+    app: 'price_1T7u82Fmxmf4g4Sf6Gib2xs3',
+    method: 'price_1T7uAiFmxmf4g4Sf0I2xPZoM',
+    mentoria: 'price_1T7uCTFmxmf4g4Sfkh9uIlYm',
+  };
+
   app.post("/api/stripe/create-checkout", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
 
+      const { planTier } = req.body;
+      const priceId = TIER_TO_PRICE[planTier];
+      if (!priceId) {
+        return res.status(400).json({ message: "Plano inválido" });
+      }
+
       const stripe = await getUncachableStripeClient();
-      const { priceId, planTier } = req.body;
 
       let customerId = user.stripeCustomerId;
       if (!customerId) {
@@ -286,7 +297,7 @@ export async function registerRoutes(
 
       const successUrl = planTier === 'mentoria'
         ? `${baseUrl}/mentoria/boas-vindas?status=success&tier=${planTier}`
-        : `${baseUrl}/planos?status=success&tier=${planTier}`;
+        : `${baseUrl}/?status=success&tier=${planTier}`;
 
       const sessionConfig: any = {
         customer: customerId,
@@ -296,7 +307,7 @@ export async function registerRoutes(
         success_url: successUrl,
         cancel_url: `${baseUrl}/planos?status=cancel`,
         payment_intent_data: {
-          metadata: { userId: String(user.id), planTier: planTier || 'app' },
+          metadata: { userId: String(user.id), planTier: planTier },
         },
       };
 
@@ -363,30 +374,11 @@ export async function registerRoutes(
     }
   });
 
-  const PRICE_TO_TIER: Record<string, string> = {};
-
-  (async () => {
-    try {
-      const stripe = await getUncachableStripeClient();
-      const tierProducts: Record<string, string> = {
-        'Mente Financeira App': 'app',
-        'Método Mente Financeira': 'method',
-        'Mentoria Transformação Financeira': 'mentoria',
-      };
-      for (const [productName, tier] of Object.entries(tierProducts)) {
-        const search = await stripe.products.search({ query: `name:'${productName}'` });
-        if (search.data.length > 0) {
-          const prices = await stripe.prices.list({ product: search.data[0].id, active: true });
-          for (const price of prices.data) {
-            PRICE_TO_TIER[price.id] = tier;
-          }
-        }
-      }
-      console.log("Price-to-tier mapping loaded:", Object.keys(PRICE_TO_TIER).length, "prices");
-    } catch (err) {
-      console.error("Failed to load price-to-tier mapping:", err);
-    }
-  })();
+  const PRICE_TO_TIER: Record<string, string> = {
+    'price_1T7u82Fmxmf4g4Sf6Gib2xs3': 'app',
+    'price_1T7uAiFmxmf4g4Sf0I2xPZoM': 'method',
+    'price_1T7uCTFmxmf4g4Sfkh9uIlYm': 'mentoria',
+  };
 
   app.post("/api/stripe/sync-purchase", requireAuth, async (req, res) => {
     try {

@@ -30,7 +30,7 @@ async function requireActiveSubscription(req: Request, res: Response, next: Next
     return res.status(401).json({ message: "Usuário não encontrado" });
   }
 
-  if (user.subscriptionStatus === "active") {
+  if (user.subscriptionStatus === "active" || (user.planTier && user.planTier !== "free")) {
     return next();
   }
 
@@ -269,7 +269,7 @@ export async function registerRoutes(
       if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
 
       const stripe = await getUncachableStripeClient();
-      const { priceId, mode } = req.body;
+      const { priceId, planTier } = req.body;
 
       let customerId = user.stripeCustomerId;
       if (!customerId) {
@@ -283,24 +283,22 @@ export async function registerRoutes(
       }
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const checkoutMode = mode === 'payment' ? 'payment' : 'subscription';
+
+      const successUrl = planTier === 'mentoria'
+        ? `${baseUrl}/mentoria/boas-vindas?status=success&tier=${planTier}`
+        : `${baseUrl}/planos?status=success&tier=${planTier}`;
 
       const sessionConfig: any = {
         customer: customerId,
         payment_method_types: ['card'],
         line_items: [{ price: priceId, quantity: 1 }],
-        mode: checkoutMode,
-        success_url: checkoutMode === 'payment'
-          ? `${baseUrl}/mentoria/boas-vindas?status=success`
-          : `${baseUrl}/planos?status=success`,
+        mode: 'payment',
+        success_url: successUrl,
         cancel_url: `${baseUrl}/planos?status=cancel`,
+        payment_intent_data: {
+          metadata: { userId: String(user.id), planTier: planTier || 'app' },
+        },
       };
-
-      if (checkoutMode === 'payment') {
-        sessionConfig.payment_intent_data = {
-          metadata: { userId: String(user.id), type: 'mentoria' },
-        };
-      }
 
       const session = await stripe.checkout.sessions.create(sessionConfig);
 
@@ -365,32 +363,80 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/stripe/webhook-subscription", requireAuth, async (req, res) => {
+  const PRICE_TO_TIER: Record<string, string> = {};
+
+  (async () => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const tierProducts: Record<string, string> = {
+        'Mente Financeira App': 'app',
+        'Método Mente Financeira': 'method',
+        'Mentoria Transformação Financeira': 'mentoria',
+      };
+      for (const [productName, tier] of Object.entries(tierProducts)) {
+        const search = await stripe.products.search({ query: `name:'${productName}'` });
+        if (search.data.length > 0) {
+          const prices = await stripe.prices.list({ product: search.data[0].id, active: true });
+          for (const price of prices.data) {
+            PRICE_TO_TIER[price.id] = tier;
+          }
+        }
+      }
+      console.log("Price-to-tier mapping loaded:", Object.keys(PRICE_TO_TIER).length, "prices");
+    } catch (err) {
+      console.error("Failed to load price-to-tier mapping:", err);
+    }
+  })();
+
+  app.post("/api/stripe/sync-purchase", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user?.stripeCustomerId) return res.json({ subscription: null });
+      if (!user?.stripeCustomerId) return res.json({ status: null });
 
       const stripe = await getUncachableStripeClient();
-      const subscriptions = await stripe.subscriptions.list({
+      const tierHierarchy: Record<string, number> = { free: 0, app: 1, method: 2, mentoria: 3 };
+
+      const sessions = await stripe.checkout.sessions.list({
         customer: user.stripeCustomerId,
-        status: 'all',
-        limit: 1,
+        limit: 10,
       });
 
-      if (subscriptions.data.length > 0) {
-        const sub = subscriptions.data[0];
-        const status = sub.status === 'active' || sub.status === 'trialing' ? 'active' : 'canceled';
-        await storage.updateUser(user.id, {
-          stripeSubscriptionId: sub.id,
-          subscriptionStatus: status,
-        });
-        return res.json({ subscription: sub, status });
+      let highestTier = user.planTier || 'free';
+      let highestLevel = tierHierarchy[highestTier] || 0;
+
+      for (const session of sessions.data) {
+        if (session.payment_status !== 'paid') continue;
+
+        const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 5 });
+        for (const item of lineItems.data) {
+          const priceId = item.price?.id;
+          if (priceId && PRICE_TO_TIER[priceId]) {
+            const itemTier = PRICE_TO_TIER[priceId];
+            const itemLevel = tierHierarchy[itemTier] || 0;
+            if (itemLevel > highestLevel) {
+              highestTier = itemTier;
+              highestLevel = itemLevel;
+            }
+          }
+        }
       }
 
-      res.json({ subscription: null });
+      if (highestLevel > (tierHierarchy[user.planTier] || 0)) {
+        await storage.updateUser(user.id, {
+          subscriptionStatus: 'active',
+          planTier: highestTier,
+        });
+        return res.json({ status: 'active', planTier: highestTier });
+      }
+
+      if (highestLevel > 0 && user.subscriptionStatus !== 'active') {
+        await storage.updateUser(user.id, { subscriptionStatus: 'active' });
+      }
+
+      res.json({ status: highestLevel > 0 ? 'active' : null, planTier: highestTier });
     } catch (err) {
-      console.error("Subscription check error:", err);
-      res.json({ subscription: null });
+      console.error("Purchase sync error:", err);
+      res.json({ status: null });
     }
   });
 

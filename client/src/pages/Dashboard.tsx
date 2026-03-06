@@ -14,8 +14,12 @@ import {
   Download,
   RefreshCw,
   AlertCircle,
-  Clock
+  Clock,
+  Sparkles,
+  Brain,
+  ArrowRight,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import {
   PieChart,
   Pie,
@@ -29,6 +33,8 @@ export default function Dashboard() {
   const { data: transactions, isLoading: loadingTransactions } =
     useTransactions();
   const { data: user } = useUser();
+  const [, navigate] = useLocation();
+  const planTier = (user as any)?.planTier || "free";
 
   const totalBalance =
     accounts?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
@@ -238,6 +244,45 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
+
+      {planTier === "free" || planTier === "app" ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {planTier === "free" && (
+            <Card
+              className="p-4 sm:p-5 rounded-2xl border-secondary/30 bg-gradient-to-r from-secondary/5 to-secondary/10 cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate("/planos")}
+              data-testid="card-upgrade-method"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-secondary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-sm text-foreground">Método Mente Financeira</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">Treinamento completo + app por €197</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
+              </div>
+            </Card>
+          )}
+          <Card
+            className="p-4 sm:p-5 rounded-2xl border-amber-400/30 bg-gradient-to-r from-amber-50/50 to-amber-100/30 dark:from-amber-950/10 dark:to-amber-900/5 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate("/planos")}
+            data-testid="card-upgrade-mentoria"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Brain className="w-5 h-5 text-amber-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-sm text-foreground">Mentoria Transformação</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">3 meses de mentoria + tudo incluso por €697</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-amber-500 shrink-0" />
+            </div>
+          </Card>
+        </div>
+      ) : null}
 
       {/* SUAS CONTAS */}
       <div>

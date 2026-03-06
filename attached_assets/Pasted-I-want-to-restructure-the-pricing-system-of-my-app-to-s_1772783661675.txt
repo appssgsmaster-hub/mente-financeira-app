@@ -1,0 +1,101 @@
+I want to restructure the pricing system of my app to support a financial transformation ecosystem, not just a simple finance tool. Please update the plans and pricing logic accordingly without breaking any existing authentication, accounts logic, or financial data system.
+
+IMPORTANT:
+Do not patch the code. Refactor cleanly and keep the UI consistent with the current design.
+
+New pricing structure:
+
+1️⃣ Free Trial
+• 15 days
+• Access to the basic financial dashboard
+• Ability to create accounts and test the system
+• Limited projections
+
+After 15 days the user must choose a plan.
+
+---
+
+2️⃣ App Access (Entry Plan)
+
+Name: Mente Financeira App
+Price: €47 (one-time payment)
+
+Includes:
+• Full access to the financial app
+• The 6 financial accounts system
+• Automated distribution
+• Financial dashboard
+• Basic projections
+• Report export
+
+Does NOT include mentorship or financial training.
+
+Purpose:
+Entry level product to bring users into the ecosystem.
+
+---
+
+3️⃣ Mente Financeira Method
+
+Name: Método Mente Financeira
+Price: €197 (one-time)
+
+Includes:
+• Everything from the App plan
+• Full financial method training
+• Guide to the 5 accounts strategy
+• Financial setup tutorial
+• Video lessons about financial organization
+• Step-by-step financial system implementation
+
+Purpose:
+Teach users how to apply the financial method.
+
+---
+
+4️⃣ Financial Transformation Mentorship
+
+Name: Mentoria Transformação Financeira
+Price: €697
+
+Includes:
+• Everything from the Method plan
+• 3 months mentorship program
+• 3 live mentorship sessions
+• Personalized financial strategy
+• Access to private community
+• Lifetime access to the app
+
+Purpose:
+Premium program for deeper financial transformation.
+
+---
+
+UI REQUIREMENTS:
+
+Update the pricing page with 3 main cards:
+
+Free Trial
+Mente Financeira App (€47)
+Método Mente Financeira (€197)
+Mentoria Transformação Financeira (€697)
+
+The Method plan should be marked as "Recommended".
+
+Add upgrade buttons inside the app dashboard that encourage users to upgrade to Method or Mentorship.
+
+---
+
+TECH REQUIREMENTS:
+
+• Update Stripe products and payment links
+• Ensure plan status is stored in the user profile
+• Allow upgrades between plans
+• Do not break login or financial data
+• Keep currency in EUR
+
+Return:
+• Updated pricing page
+• Stripe configuration
+• Plan logic
+• Upgrade system

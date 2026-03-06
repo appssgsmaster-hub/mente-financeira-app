@@ -3,8 +3,9 @@ import { useAccounts, useUpdateAccountPercentages, useUser } from "@/hooks/use-f
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil, RefreshCw } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 
@@ -18,6 +19,7 @@ export default function Settings() {
   const [localValues, setLocalValues] = useState<
     { id: number; percentage: number }[]
   >([]);
+  const [redistribute, setRedistribute] = useState(false);
 
   const [selectedCurrency, setSelectedCurrency] = useState(user?.currency || "BRL");
   const [isUpdatingCurrency, setIsUpdatingCurrency] = useState(false);
@@ -71,10 +73,14 @@ export default function Settings() {
   const handleSavePercentages = () => {
     if (!isValid) return;
     updatePercentages(
-      { updates: localValues },
+      { updates: localValues, redistribute },
       {
         onSuccess: () => {
-          toast({ title: "Distribuição salva!", description: "Sua meta de distribuição foi atualizada." });
+          const msg = redistribute
+            ? "Porcentagens e saldos redistribuídos com sucesso!"
+            : "Sua meta de distribuição foi atualizada.";
+          toast({ title: "Distribuição salva!", description: msg });
+          setRedistribute(false);
         },
         onError: () => {
           toast({ title: "Erro ao salvar", description: "Não foi possível atualizar as porcentagens.", variant: "destructive" });
@@ -255,10 +261,29 @@ export default function Settings() {
           })}
         </div>
 
-        <div className="mt-12 pt-6 border-t flex justify-end gap-4">
+        <div className="mt-8 p-5 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div>
+                <p className="font-semibold text-sm text-foreground">Redistribuir saldos atuais</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Ao ativar, o saldo total do ecossistema será redistribuído entre as contas conforme as novas porcentagens. Desativado, só afeta entradas futuras.
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={redistribute}
+              onCheckedChange={setRedistribute}
+              data-testid="switch-redistribute"
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 pt-6 border-t flex justify-end gap-4">
           <Button
             variant="outline"
-            onClick={() => setLocalValues(accounts.map((a) => ({ id: a.id, percentage: a.percentage })))}
+            onClick={() => { setLocalValues(accounts.map((a) => ({ id: a.id, percentage: a.percentage }))); setRedistribute(false); }}
             disabled={isPending}
             className="rounded-2xl"
           >
@@ -268,9 +293,10 @@ export default function Settings() {
             onClick={handleSavePercentages}
             disabled={!isValid || isPending}
             className="rounded-2xl px-8 bg-primary hover:bg-primary/90 shadow-lg"
+            data-testid="button-save-percentages"
           >
             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Salvar Distribuição
+            {redistribute ? "Salvar e Redistribuir" : "Salvar Distribuição"}
           </Button>
         </div>
       </Card>

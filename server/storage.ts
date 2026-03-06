@@ -7,7 +7,7 @@ import {
   type UpdateAccountPercentagesRequest,
   type DistributeIncomeRequest
 } from "@shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -83,17 +83,53 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(accounts).where(eq(accounts.userId, userId));
   }
 
-  async updateAccountPercentages(userId: number, updates: UpdateAccountPercentagesRequest['updates']): Promise<Account[]> {
+  async updateAccountPercentages(userId: number, updates: UpdateAccountPercentagesRequest['updates'], redistribute: boolean = false): Promise<Account[]> {
     const total = updates.reduce((sum, u) => sum + u.percentage, 0);
     if (total !== 100) {
       throw new Error("As porcentagens devem somar exatamente 100%.");
+    }
+
+    const userAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
+    const validIds = new Set(userAccounts.map(a => a.id));
+    for (const update of updates) {
+      if (!validIds.has(update.id)) {
+        throw new Error("Conta não pertence ao utilizador.");
+      }
+    }
+
+    if (redistribute) {
+      const totalBalance = userAccounts.reduce((sum, a) => sum + a.balance, 0);
+
+      const shares = updates.map(u => ({
+        ...u,
+        exact: totalBalance * (u.percentage / 100),
+        floored: Math.floor(totalBalance * (u.percentage / 100)),
+      }));
+      shares.forEach(s => { s.exact = s.exact - s.floored; });
+      let remainder = totalBalance - shares.reduce((sum, s) => sum + s.floored, 0);
+      const byRemainder = [...shares].sort((a, b) => b.exact - a.exact);
+      for (const s of byRemainder) {
+        if (remainder <= 0) break;
+        s.floored += 1;
+        remainder -= 1;
+      }
+
+      const updatedAccounts = [];
+      for (const share of shares) {
+        const [acc] = await db.update(accounts)
+          .set({ percentage: share.percentage, balance: share.floored })
+          .where(and(eq(accounts.id, share.id), eq(accounts.userId, userId)))
+          .returning();
+        if (acc) updatedAccounts.push(acc);
+      }
+      return updatedAccounts;
     }
 
     const updatedAccounts = [];
     for (const update of updates) {
       const [acc] = await db.update(accounts)
         .set({ percentage: update.percentage })
-        .where(eq(accounts.id, update.id))
+        .where(and(eq(accounts.id, update.id), eq(accounts.userId, userId)))
         .returning();
       if (acc) updatedAccounts.push(acc);
     }

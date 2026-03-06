@@ -188,7 +188,8 @@ export async function registerRoutes(
   app.post(api.accounts.updatePercentages.path, requireActiveSubscription, async (req, res) => {
     try {
       const input = api.accounts.updatePercentages.input.parse(req.body);
-      const updated = await storage.updateAccountPercentages(req.session.userId!, input.updates);
+      const redistribute = req.body.redistribute === true;
+      const updated = await storage.updateAccountPercentages(req.session.userId!, input.updates, redistribute);
       res.json(updated);
     } catch (err) {
       res.status(400).json({ message: (err as Error).message });

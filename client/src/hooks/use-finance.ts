@@ -71,6 +71,7 @@ export function useUpdateAccountPercentages() {
   return useMutation({
     mutationFn: async (data: {
       updates: { id: number; percentage: number }[];
+      redistribute?: boolean;
     }) => {
       return fetchWithZod<Account[]>(
         api.accounts.updatePercentages.path,

@@ -149,9 +149,19 @@ export function MainLayout({ children }: { children: ReactNode }) {
           
           <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6 lg:p-10 relative">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-50 pointer-events-none -z-10" />
-            <div className="max-w-7xl mx-auto h-full">
+            <div className="max-w-7xl mx-auto">
               {children}
             </div>
+            <footer className="mt-12 pb-6 border-t border-border/30 pt-6">
+              <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+                <p>&copy; {new Date().getFullYear()} SGS Group. Todos os direitos reservados.</p>
+                <div className="flex items-center gap-4">
+                  <a href="/privacy-policy" className="hover:text-foreground transition-colors" data-testid="link-footer-privacy">Política de Privacidade</a>
+                  <a href="/terms-of-use" className="hover:text-foreground transition-colors" data-testid="link-footer-terms">Termos de Uso</a>
+                  <span className="text-muted-foreground/60" data-testid="text-footer-gdpr">GDPR Compliant</span>
+                </div>
+              </div>
+            </footer>
           </main>
         </div>
       </div>

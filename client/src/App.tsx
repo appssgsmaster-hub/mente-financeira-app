@@ -15,10 +15,26 @@ import Payments from "./pages/Payments";
 import Education from "./pages/Education";
 import Plans from "./pages/Plans";
 import MentoriaWelcome from "./pages/MentoriaWelcome";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfUse from "./pages/TermsOfUse";
 import { Loader2 } from "lucide-react";
+
+function PublicRoutes() {
+  return (
+    <Switch>
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/terms-of-use" component={TermsOfUse} />
+    </Switch>
+  );
+}
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
+
+  const path = window.location.pathname;
+  if (path === "/privacy-policy" || path === "/terms-of-use") {
+    return <PublicRoutes />;
+  }
 
   if (isLoading) {
     return (

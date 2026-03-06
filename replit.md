@@ -17,7 +17,8 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - **Mentoria Transformação Financeira** (€697): Everything + 3-month mentorship, 3 live sessions, private community, lifetime access
 
 ## Key Features
-- Multi-user authentication (register/login with email+password)
+- Multi-user authentication (register/login with email+password, bcrypt 12 rounds)
+- GDPR compliance: consent checkbox on registration, Privacy Policy & Terms of Use pages
 - 15-day free trial for new users
 - Tiered one-time payment plans via Stripe (€47 / €197 / €697)
 - Plan upgrades between tiers
@@ -30,6 +31,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - AI Mentor: dynamic motivational messages based on financial context
 - PWA (Progressive Web App): installable on mobile/desktop, offline-capable
 - Fully mobile-responsive layout across all pages
+- Footer with Privacy Policy, Terms of Use, and GDPR Compliance links
 
 ## Database Schema
 - `users`: id (serial), name, email, passwordHash, currency, trialStartDate, trialEndDate, stripeCustomerId, stripeSubscriptionId, subscriptionStatus, **planTier** (free|app|method|mentoria), createdAt
@@ -65,4 +67,6 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - `client/src/pages/Plans.tsx` — Pricing page with 4 plan cards (trial + 3 paid)
 - `client/src/pages/MentoriaWelcome.tsx` — Post-purchase mentoring welcome page
 - `client/src/components/layout/MainLayout.tsx` — App layout with user menu
+- `client/src/pages/PrivacyPolicy.tsx` — GDPR Privacy Policy (public, no auth)
+- `client/src/pages/TermsOfUse.tsx` — Terms of Use (public, no auth)
 - `client/src/components/layout/AppSidebar.tsx` — Navigation sidebar

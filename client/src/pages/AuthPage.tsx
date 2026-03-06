@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, TrendingUp, Shield, Zap } from "lucide-react";
 
@@ -14,6 +15,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [gdprConsent, setGdprConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const { toast } = useToast();
@@ -23,6 +25,11 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      if (!isLogin && !gdprConsent) {
+        toast({ title: "Consentimento necessário", description: "Você precisa aceitar a Política de Privacidade e os Termos de Uso para criar sua conta.", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
       if (isLogin) {
         await login(email, password);
       } else {
@@ -161,10 +168,28 @@ export default function AuthPage() {
                 </div>
               </div>
 
+              {!isLogin && (
+                <div className="flex items-start gap-2.5 pt-1">
+                  <Checkbox
+                    id="gdpr-consent"
+                    checked={gdprConsent}
+                    onCheckedChange={(checked) => setGdprConsent(checked === true)}
+                    data-testid="checkbox-gdpr-consent"
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="gdpr-consent" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                    Concordo com a{" "}
+                    <a href="/privacy-policy" target="_blank" className="text-primary hover:underline">Política de Privacidade</a>
+                    {" "}e os{" "}
+                    <a href="/terms-of-use" target="_blank" className="text-primary hover:underline">Termos de Uso</a>.
+                  </Label>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 className="w-full h-12 rounded-xl text-lg font-semibold"
-                disabled={loading}
+                disabled={loading || (!isLogin && !gdprConsent)}
                 data-testid="button-submit-auth"
               >
                 {loading ? (
@@ -184,6 +209,7 @@ export default function AuthPage() {
                   setName("");
                   setEmail("");
                   setPassword("");
+                  setGdprConsent(false);
                 }}
                 className="text-sm text-primary hover:underline font-medium"
                 data-testid="button-toggle-auth-mode"
@@ -196,7 +222,9 @@ export default function AuthPage() {
           </Card>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
-            Ao criar sua conta, você concorda com nossos termos de uso e política de privacidade.
+            <a href="/privacy-policy" target="_blank" className="hover:underline">Política de Privacidade</a>
+            {" · "}
+            <a href="/terms-of-use" target="_blank" className="hover:underline">Termos de Uso</a>
           </p>
         </div>
       </div>

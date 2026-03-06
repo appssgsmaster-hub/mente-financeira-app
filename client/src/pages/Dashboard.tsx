@@ -80,10 +80,26 @@ export default function Dashboard() {
     nextWeek.setDate(now.getDate() + 7);
     const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
+    const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthIndex = now.getMonth();
+    const year = now.getFullYear();
+    const msEnd = new Date(year, monthIndex + 1, 0).getTime();
+
     return commitments.filter(c => {
-      // Simplificação: alerta se a data de início for no passado (atrasado) ou nos próximos 7 dias (vence logo)
-      // Nota: No mundo real, verificaríamos se já foi pago, mas aqui usamos o planejamento como guia
-      return c.startDate <= nextWeekStr;
+      const paidPeriods: string[] = c.paidPeriods || [];
+      if (paidPeriods.includes(currentPeriod)) return false;
+
+      const d = new Date(c.startDate);
+      const t = d.getTime();
+      let active = false;
+      if (c.recurrence === "FIXO") {
+        active = t <= msEnd;
+      } else {
+        const n = Math.max(1, Number(c.installments ?? 1));
+        const diff = (year - d.getFullYear()) * 12 + (monthIndex - d.getMonth());
+        active = diff >= 0 && diff < n && t <= msEnd;
+      }
+      return active;
     }).map(c => ({
       ...c,
       status: c.startDate < todayStr ? 'atrasado' : 'soon',

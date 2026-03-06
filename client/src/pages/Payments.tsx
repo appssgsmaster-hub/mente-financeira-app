@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowUpRight, Receipt, Pencil, Trash2, PlusCircle, Globe } from "lucide-react";
+import { ArrowUpRight, Receipt, Pencil, Trash2, PlusCircle, Globe, Link2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,6 @@ import {
   useUser,
 } from "@/hooks/use-finance";
 
-// --- helpers ---
 function parseMoneyInput(raw: string) {
   let v = raw.replace(/[^\d.,-]/g, "");
   if (v.includes(",") && v.includes(".")) {
@@ -35,6 +34,33 @@ function formatCurrency(value: number, currency = "BRL") {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value / 100);
+}
+
+type Commitment = {
+  id: string;
+  accountId: number;
+  description: string;
+  value: number;
+  startDate: string;
+  recurrence: "FIXO" | "PARCELADO";
+  installments?: number;
+  category: string;
+  createdAt: string;
+  paidPeriods?: string[];
+};
+
+function getLsKey(userId?: number) {
+  return userId ? `sgs_commitments_v1_user_${userId}` : "sgs_commitments_v1";
+}
+
+function getPeriodFromDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getCurrentPeriod() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export default function Payments() {
@@ -58,8 +84,8 @@ export default function Payments() {
   const [amount, setAmount] = useState("");
   const [selectedAcc, setSelectedAcc] = useState<string>("");
   const [txDate, setTxDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [linkedCommitment, setLinkedCommitment] = useState<string>("");
 
-  // Modal states for editing
   const [editingId, setEditingId] = useState<number | null>(null);
   const editingTx = useMemo(
     () => (transactions || []).find((t: any) => t.id === editingId) || null,
@@ -68,14 +94,85 @@ export default function Payments() {
   const [editDescription, setEditDescription] = useState("");
   const [editAmountRaw, setEditAmountRaw] = useState("");
 
+  const [commitments, setCommitments] = useState<Commitment[]>([]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const key = getLsKey(user.id);
+    function loadCommitments() {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setCommitments(parsed);
+        }
+      } catch {}
+    }
+    loadCommitments();
+    function onStorage(e: StorageEvent) {
+      if (e.key === key) loadCommitments();
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [user?.id]);
+
+  const openCommitments = useMemo(() => {
+    const now = new Date();
+    const currentPeriod = getCurrentPeriod();
+    const monthIndex = now.getMonth();
+    const year = now.getFullYear();
+    const msEnd = new Date(year, monthIndex + 1, 0).getTime();
+
+    return commitments.filter((c) => {
+      const d = new Date(c.startDate);
+      const t = d.getTime();
+      let active = false;
+      if (c.recurrence === "FIXO") {
+        active = t <= msEnd;
+      } else {
+        const n = Math.max(1, Number(c.installments ?? 1));
+        const diff = (year - d.getFullYear()) * 12 + (monthIndex - d.getMonth());
+        active = diff >= 0 && diff < n && t <= msEnd;
+      }
+      if (!active) return false;
+      const paid = c.paidPeriods || [];
+      return !paid.includes(currentPeriod);
+    });
+  }, [commitments]);
+
+  function handleLinkChange(commitmentId: string) {
+    setLinkedCommitment(commitmentId);
+    if (commitmentId) {
+      const c = commitments.find((x) => x.id === commitmentId);
+      if (c) {
+        setDesc(c.description);
+        setAmount(String((c.value / 100).toFixed(2)).replace(".", ","));
+        setSelectedAcc(String(c.accountId));
+      }
+    }
+  }
+
+  function markCommitmentPaid(commitmentId: string, dateStr: string) {
+    if (!user?.id) return;
+    const period = getPeriodFromDate(dateStr);
+    const updated = commitments.map((c) => {
+      if (c.id !== commitmentId) return c;
+      const paid = c.paidPeriods || [];
+      if (paid.includes(period)) return c;
+      return { ...c, paidPeriods: [...paid, period] };
+    });
+    setCommitments(updated);
+    localStorage.setItem(getLsKey(user.id), JSON.stringify(updated));
+  }
+
   function handleAddIncome() {
     const val = parseMoneyInput(amount);
     if (!val || !desc) return toast({ title: "Erro", description: "Preencha valor e descrição", variant: "destructive" });
-    
+
     distributeIncome({ amount: Math.round(val * 100), description: desc, date: txDate }, {
       onSuccess: () => {
         toast({ title: "Sucesso", description: "Entrada distribuída no ecossistema!" });
-        setDesc(""); setAmount(""); setTxDate(new Date().toISOString().split("T")[0]);
+        setDesc(""); setAmount(""); setTxDate(new Date().toISOString().split("T")[0]); setLinkedCommitment("");
       }
     });
   }
@@ -83,7 +180,7 @@ export default function Payments() {
   function handleAddExpense() {
     const val = parseMoneyInput(amount);
     if (!val || !desc || !selectedAcc) return toast({ title: "Erro", description: "Preencha todos os campos", variant: "destructive" });
-    
+
     createExpense({
       userId: 0,
       description: desc,
@@ -94,8 +191,13 @@ export default function Payments() {
       date: txDate
     } as any, {
       onSuccess: () => {
-        toast({ title: "Sucesso", description: "Saída registrada com sucesso!" });
-        setDesc(""); setAmount(""); setSelectedAcc(""); setTxDate(new Date().toISOString().split("T")[0]);
+        if (linkedCommitment) {
+          markCommitmentPaid(linkedCommitment, txDate);
+          toast({ title: "Sucesso", description: "Saída registrada e compromisso marcado como pago!" });
+        } else {
+          toast({ title: "Sucesso", description: "Saída registrada com sucesso!" });
+        }
+        setDesc(""); setAmount(""); setSelectedAcc(""); setTxDate(new Date().toISOString().split("T")[0]); setLinkedCommitment("");
       }
     });
   }
@@ -142,23 +244,42 @@ export default function Payments() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Card de Lançamento */}
         <Card className="p-6 rounded-3xl border-border shadow-sm space-y-4">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <PlusCircle className="w-5 h-5 text-primary" /> Novo Lançamento
           </h2>
           <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Link2 className="w-3.5 h-3.5" /> Vincular?
+              </label>
+              <select
+                className="w-full p-3 rounded-2xl border border-input bg-background text-sm"
+                value={linkedCommitment}
+                onChange={(e) => handleLinkChange(e.target.value)}
+                data-testid="select-link-commitment"
+              >
+                <option value="">Manual</option>
+                {openCommitments.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.description} — {formatCurrency(c.value, user?.currency)}
+                  </option>
+                ))}
+              </select>
+            </div>
             <input
               placeholder="Descrição (ex: Salário, Aluguel...)"
               className="w-full p-3 rounded-2xl border border-input bg-background"
               value={desc}
               onChange={e => setDesc(e.target.value)}
+              data-testid="input-tx-description"
             />
             <input
               placeholder="Valor (ex: 1.500,00)"
               className="w-full p-3 rounded-2xl border border-input bg-background"
               value={amount}
               onChange={e => setAmount(e.target.value)}
+              data-testid="input-tx-amount"
             />
             <div className="space-y-1">
               <label className="text-sm font-medium text-muted-foreground">Data do lançamento</label>
@@ -180,17 +301,18 @@ export default function Payments() {
               {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <Button 
+              <Button
                 className="flex-1 rounded-2xl bg-secondary hover:bg-secondary/90 text-white text-sm sm:text-base py-2.5 sm:py-3"
                 onClick={handleAddIncome}
                 disabled={isDistributing}
               >
                 Registrar Entrada
               </Button>
-              <Button 
+              <Button
                 className="flex-1 rounded-2xl bg-destructive hover:bg-destructive/90 text-white text-sm sm:text-base py-2.5 sm:py-3"
                 onClick={handleAddExpense}
                 disabled={isCreatingExpense}
+                data-testid="button-add-expense"
               >
                 Registrar Saída
               </Button>
@@ -198,12 +320,12 @@ export default function Payments() {
           </div>
         </Card>
 
-        {/* Info Card */}
         <Card className="p-6 rounded-3xl bg-primary/5 border-primary/10 flex flex-col justify-center">
           <h3 className="text-lg font-bold text-primary mb-2">Como funciona?</h3>
           <ul className="text-sm text-muted-foreground space-y-2">
             <li>• <b>Entradas:</b> São distribuídas automaticamente entre todas as contas conforme suas porcentagens.</li>
             <li>• <b>Saídas:</b> São deduzidas diretamente da conta selecionada e do ecossistema.</li>
+            <li>• <b>Vincular:</b> Ao vincular a um compromisso, os campos são preenchidos automaticamente e o compromisso é marcado como pago no mês.</li>
             <li>• <b>Apagar:</b> Reverte automaticamente o saldo na conta e no ecossistema.</li>
           </ul>
         </Card>

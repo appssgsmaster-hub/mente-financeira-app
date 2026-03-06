@@ -30,12 +30,13 @@ type Commitment = {
   id: string;
   accountId: number;
   description: string;
-  value: number; // CENTAVOS
-  startDate: string; // YYYY-MM-DD
+  value: number;
+  startDate: string;
   recurrence: Recurrence;
-  installments?: number; // only PARCELADO
+  installments?: number;
   category: string;
   createdAt: string;
+  paidPeriods?: string[];
 };
 
 function getLsKey(userId?: number) {
@@ -55,6 +56,16 @@ const CATEGORIES = [
 ];
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function getPeriodKey(monthIndex: number, year?: number) {
+  const y = year ?? new Date().getFullYear();
+  return `${y}-${String(monthIndex + 1).padStart(2, "0")}`;
+}
+
+function isCommitmentPaid(c: Commitment, monthIndex: number, year?: number) {
+  const period = getPeriodKey(monthIndex, year);
+  return (c.paidPeriods || []).includes(period);
+}
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -153,6 +164,8 @@ export default function Projections() {
   }, [items, monthIndex]);
 
   const totalCommitted = commitmentsThisMonth.reduce((sum, c) => sum + c.value, 0);
+  const totalPaid = commitmentsThisMonth.filter(c => isCommitmentPaid(c, monthIndex)).reduce((sum, c) => sum + c.value, 0);
+  const totalOpen = totalCommitted - totalPaid;
   const totalBalance = accounts?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
 
   const chartData = useMemo(() => {
@@ -281,8 +294,20 @@ export default function Projections() {
           <Card className="p-6 rounded-3xl bg-secondary/10 border-secondary/20 border text-center">
             <Target className="w-8 h-8 text-secondary mx-auto mb-3" />
             <p className="text-sm font-semibold text-secondary uppercase tracking-widest mb-1">Impacto no Mês</p>
-            <h2 className="text-3xl font-display font-bold text-foreground">{formatCurrency(totalCommitted)}</h2>
-            <p className="text-xs text-muted-foreground mt-2">Total de compromissos planejados para {MONTHS[monthIndex]}.</p>
+            <h2 className="text-3xl font-display font-bold text-foreground" data-testid="text-total-committed">{formatCurrency(totalCommitted)}</h2>
+            <p className="text-xs text-muted-foreground mt-2">Total de compromissos para {MONTHS[monthIndex]}.</p>
+            {totalPaid > 0 && (
+              <div className="mt-3 pt-3 border-t border-secondary/20 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-green-600 font-semibold">Pago</span>
+                  <span className="text-green-600 font-bold" data-testid="text-total-paid">{formatCurrency(totalPaid)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-destructive font-semibold">Em aberto</span>
+                  <span className="text-destructive font-bold" data-testid="text-total-open">{formatCurrency(totalOpen)}</span>
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card className="p-6 rounded-3xl border-border shadow-sm">
@@ -345,34 +370,44 @@ export default function Projections() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {accItems.map((c) => (
-                        <div key={c.id} className="p-4 border border-border/60 rounded-2xl bg-muted/5 flex justify-between items-center group hover:border-primary/30 transition-all">
-                          <div className="min-w-0">
-                            <p className="font-bold text-foreground truncate">{c.description}</p>
-                            <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
-                              <span className="bg-muted px-1.5 py-0.5 rounded-md">{c.category}</span>
-                              <span className="bg-primary/5 text-primary px-1.5 py-0.5 rounded-md">
-                                {c.recurrence === "FIXO" ? "Recorrente" : `${c.installments} parcelas`}
-                              </span>
-                              <span className="bg-muted px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                                <Calendar className="w-2.5 h-2.5" />
-                                {new Date(c.startDate).toLocaleDateString("pt-BR")}
-                              </span>
+                      {accItems.map((c) => {
+                        const paid = isCommitmentPaid(c, monthIndex);
+                        return (
+                          <div key={c.id} className={`p-4 border rounded-2xl flex justify-between items-center group transition-all ${paid ? "border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-950/20" : "border-border/60 bg-muted/5 hover:border-primary/30"}`}>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className={`font-bold truncate ${paid ? "text-green-700 dark:text-green-400 line-through" : "text-foreground"}`}>{c.description}</p>
+                                {paid && (
+                                  <span className="text-[9px] font-bold uppercase tracking-wider bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full shrink-0" data-testid={`badge-paid-${c.id}`}>
+                                    Pago
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+                                <span className="bg-muted px-1.5 py-0.5 rounded-md">{c.category}</span>
+                                <span className="bg-primary/5 text-primary px-1.5 py-0.5 rounded-md">
+                                  {c.recurrence === "FIXO" ? "Recorrente" : `${c.installments} parcelas`}
+                                </span>
+                                <span className="bg-muted px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                                  <Calendar className="w-2.5 h-2.5" />
+                                  {new Date(c.startDate).toLocaleDateString("pt-BR")}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 ml-4">
+                              <span className={`font-display font-bold text-lg ${paid ? "text-green-700 dark:text-green-400" : "text-foreground"}`}>{formatCurrency(c.value)}</span>
+                              <div className="flex flex-col gap-1">
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(c); }} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-primary">
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove(c.id); }} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0 ml-4">
-                            <span className="font-display font-bold text-lg text-foreground">{formatCurrency(c.value)}</span>
-                            <div className="flex flex-col gap-1">
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(c); }} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-primary">
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove(c.id); }} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive">
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

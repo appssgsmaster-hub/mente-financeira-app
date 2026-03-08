@@ -31,8 +31,8 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - Commitment linking: expenses and income can be linked to open commitments, marking them as paid/received
 - Redistribute balances: toggle in Settings to redistribute ecosystem balance when changing percentages
 - Dashboard with alerts and motivational messages (shows both expense and income alerts)
-- Open Debts card: debt tracking (localStorage), total debt display, simulation modal (months to pay off), learning CTA
-- Debt Strategy page (/mentorship/debt-strategy): educational content on debt management strategies
+- Debt Strategy page (/dividas): full CRUD debt management with priority levels (Alta/Média/Baixa), per-debt simulation, mark as paid/unpaid, add installment to Projections, AI guidance popup, strategy cards
+- Dashboard compact debt summary card: clickable card showing active debt count + total, navigates to /dividas
 - AI Mentor: dynamic motivational messages based on financial context
 - PWA (Progressive Web App): installable on mobile/desktop, offline-capable
 - Fully mobile-responsive layout across all pages
@@ -47,6 +47,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 ## Important Notes
 - Amounts stored in **cents** — divide by 100 for display, multiply by 100 on input
 - Commitments (projections) stored in `localStorage` key `sgs_commitments_v1_user_${userId}`
+- Debts stored in `localStorage` key `sgs_debts_v1_user_${userId}` with `{ id, creditor, amount, registeredDate, priority, paid }`
 - Session secret from `SESSION_SECRET` env var
 - Stripe connector: `connection:conn_stripe_01KJYXD88BBD71F7JEDMHSGHJ1`
 - Stripe products: "Mente Financeira App" (€47), "Método Mente Financeira" (€197), "Mentoria Transformação Financeira" (€697)
@@ -69,6 +70,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - `client/src/hooks/use-finance.ts` — Financial data hooks
 - `client/src/pages/AuthPage.tsx` — Login/Register page
 - `client/src/pages/Dashboard.tsx` — Main dashboard with upgrade prompts
+- `client/src/pages/DebtStrategy.tsx` — Debt management module (/dividas)
 - `client/src/pages/Plans.tsx` — Pricing page with 4 plan cards (trial + 3 paid)
 - `client/src/pages/MentoriaWelcome.tsx` — Post-purchase mentoring welcome page
 - `client/src/components/layout/MainLayout.tsx` — App layout with user menu

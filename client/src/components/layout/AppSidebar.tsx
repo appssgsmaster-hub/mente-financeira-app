@@ -5,7 +5,8 @@ import {
   TrendingUp, 
   CreditCard, 
   BookOpen, 
-  Sparkles
+  Sparkles,
+  Shield
 } from "lucide-react";
 import {
   Sidebar,
@@ -23,6 +24,7 @@ const NAV_ITEMS: { title: string; href: string; icon: typeof LayoutDashboard; hi
   { title: "Ajustes", href: "/ajustes", icon: SlidersHorizontal },
   { title: "Projeções", href: "/projecoes", icon: TrendingUp },
   { title: "Pagamentos", href: "/pagamentos", icon: CreditCard },
+  { title: "Dívidas", href: "/dividas", icon: Shield },
   { title: "Educação", href: "/educacao", icon: BookOpen },
   { title: "Planos & Pagamento", href: "/planos", icon: Sparkles, highlight: true },
 ];

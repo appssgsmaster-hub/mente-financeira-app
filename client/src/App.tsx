@@ -77,7 +77,7 @@ function AppRoutes() {
         <Route path="/educacao" component={Education} />
         <Route path="/planos" component={Plans} />
         <Route path="/mentoria/boas-vindas" component={MentoriaWelcome} />
-        <Route path="/mentorship/debt-strategy" component={DebtStrategy} />
+        <Route path="/dividas" component={DebtStrategy} />
         <Route component={NotFound} />
       </Switch>
     </MainLayout>

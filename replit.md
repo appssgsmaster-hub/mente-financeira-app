@@ -26,8 +26,11 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - 6 accounts financial method with configurable percentages
 - Income distribution across accounts by percentage
 - Transaction tracking (income/expense) with custom date picker
-- Projection system with commitments (localStorage-based)
-- Dashboard with alerts and motivational messages
+- Projection system with commitments (localStorage-based): monthly, weekly (SEMANAL), and installment (PARCELADO) recurrences
+- Income receivables: projected future income with "A Receber" feature
+- Commitment linking: expenses and income can be linked to open commitments, marking them as paid/received
+- Redistribute balances: toggle in Settings to redistribute ecosystem balance when changing percentages
+- Dashboard with alerts and motivational messages (shows both expense and income alerts)
 - AI Mentor: dynamic motivational messages based on financial context
 - PWA (Progressive Web App): installable on mobile/desktop, offline-capable
 - Fully mobile-responsive layout across all pages

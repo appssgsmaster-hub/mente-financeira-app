@@ -42,11 +42,12 @@ type Commitment = {
   description: string;
   value: number;
   startDate: string;
-  recurrence: "FIXO" | "PARCELADO";
+  recurrence: "FIXO" | "SEMANAL" | "PARCELADO";
   installments?: number;
   category: string;
   createdAt: string;
   paidPeriods?: string[];
+  commitmentType?: "expense" | "income";
 };
 
 function getLsKey(userId?: number) {
@@ -124,10 +125,36 @@ export default function Payments() {
     const msEnd = new Date(year, monthIndex + 1, 0).getTime();
 
     return commitments.filter((c) => {
+      if ((c.commitmentType || "expense") !== "expense") return false;
       const d = new Date(c.startDate);
       const t = d.getTime();
       let active = false;
-      if (c.recurrence === "FIXO") {
+      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
+        active = t <= msEnd;
+      } else {
+        const n = Math.max(1, Number(c.installments ?? 1));
+        const diff = (year - d.getFullYear()) * 12 + (monthIndex - d.getMonth());
+        active = diff >= 0 && diff < n && t <= msEnd;
+      }
+      if (!active) return false;
+      const paid = c.paidPeriods || [];
+      return !paid.includes(currentPeriod);
+    });
+  }, [commitments]);
+
+  const openIncomeCommitments = useMemo(() => {
+    const now = new Date();
+    const currentPeriod = getCurrentPeriod();
+    const monthIndex = now.getMonth();
+    const year = now.getFullYear();
+    const msEnd = new Date(year, monthIndex + 1, 0).getTime();
+
+    return commitments.filter((c) => {
+      if (c.commitmentType !== "income") return false;
+      const d = new Date(c.startDate);
+      const t = d.getTime();
+      let active = false;
+      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
         active = t <= msEnd;
       } else {
         const n = Math.max(1, Number(c.installments ?? 1));
@@ -147,9 +174,19 @@ export default function Payments() {
       if (c) {
         setDesc(c.description);
         setAmount(String((c.value / 100).toFixed(2)).replace(".", ","));
-        setSelectedAcc(String(c.accountId));
+        if ((c.commitmentType || "expense") === "expense") {
+          setSelectedAcc(String(c.accountId));
+        } else {
+          setSelectedAcc("");
+        }
       }
     }
+  }
+
+  function getLinkedCommitmentType(): "expense" | "income" | null {
+    if (!linkedCommitment) return null;
+    const c = commitments.find((x) => x.id === linkedCommitment);
+    return c ? (c.commitmentType || "expense") : null;
   }
 
   function markCommitmentPaid(commitmentId: string, dateStr: string) {
@@ -179,6 +216,20 @@ export default function Payments() {
 
   function handleAddExpense() {
     const val = parseMoneyInput(amount);
+    const linkedType = getLinkedCommitmentType();
+
+    if (linkedType === "income") {
+      if (!val || !desc) return toast({ title: "Erro", description: "Preencha valor e descrição", variant: "destructive" });
+      distributeIncome({ amount: Math.round(val * 100), description: desc, date: txDate }, {
+        onSuccess: () => {
+          markCommitmentPaid(linkedCommitment, txDate);
+          toast({ title: "Sucesso", description: "Entrada registrada e receita marcada como recebida!" });
+          setDesc(""); setAmount(""); setSelectedAcc(""); setTxDate(new Date().toISOString().split("T")[0]); setLinkedCommitment("");
+        }
+      });
+      return;
+    }
+
     if (!val || !desc || !selectedAcc) return toast({ title: "Erro", description: "Preencha todos os campos", variant: "destructive" });
 
     createExpense({
@@ -260,11 +311,24 @@ export default function Payments() {
                 data-testid="select-link-commitment"
               >
                 <option value="">Manual</option>
-                {openCommitments.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.description} — {formatCurrency(c.value, user?.currency)}
-                  </option>
-                ))}
+                {openCommitments.length > 0 && (
+                  <optgroup label="Compromissos (Saídas)">
+                    {openCommitments.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.description} — {formatCurrency(c.value, user?.currency)}{c.recurrence === "SEMANAL" ? " /semana" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {openIncomeCommitments.length > 0 && (
+                  <optgroup label="Receitas a Receber (Entradas)">
+                    {openIncomeCommitments.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.description} — {formatCurrency(c.value, user?.currency)}{c.recurrence === "SEMANAL" ? " /semana" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             <input
@@ -309,12 +373,12 @@ export default function Payments() {
                 Registrar Entrada
               </Button>
               <Button
-                className="flex-1 rounded-2xl bg-destructive hover:bg-destructive/90 text-white text-sm sm:text-base py-2.5 sm:py-3"
+                className={`flex-1 rounded-2xl text-white text-sm sm:text-base py-2.5 sm:py-3 ${getLinkedCommitmentType() === "income" ? "bg-secondary hover:bg-secondary/90" : "bg-destructive hover:bg-destructive/90"}`}
                 onClick={handleAddExpense}
-                disabled={isCreatingExpense}
+                disabled={isCreatingExpense || isDistributing}
                 data-testid="button-add-expense"
               >
-                Registrar Saída
+                {getLinkedCommitmentType() === "income" ? "Registrar Entrada Vinculada" : "Registrar Saída"}
               </Button>
             </div>
           </div>
@@ -325,7 +389,8 @@ export default function Payments() {
           <ul className="text-sm text-muted-foreground space-y-2">
             <li>• <b>Entradas:</b> São distribuídas automaticamente entre todas as contas conforme suas porcentagens.</li>
             <li>• <b>Saídas:</b> São deduzidas diretamente da conta selecionada e do ecossistema.</li>
-            <li>• <b>Vincular:</b> Ao vincular a um compromisso, os campos são preenchidos automaticamente e o compromisso é marcado como pago no mês.</li>
+            <li>• <b>Vincular Saída:</b> Ao vincular a um compromisso, os campos são preenchidos e o compromisso é marcado como pago.</li>
+            <li>• <b>Vincular Entrada:</b> Ao vincular a uma receita a receber, registra a entrada e marca como recebida.</li>
             <li>• <b>Apagar:</b> Reverte automaticamente o saldo na conta e no ecossistema.</li>
           </ul>
         </Card>

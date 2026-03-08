@@ -92,7 +92,7 @@ export default function Dashboard() {
       const d = new Date(c.startDate);
       const t = d.getTime();
       let active = false;
-      if (c.recurrence === "FIXO") {
+      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
         active = t <= msEnd;
       } else {
         const n = Math.max(1, Number(c.installments ?? 1));
@@ -102,6 +102,7 @@ export default function Dashboard() {
       return active;
     }).map(c => ({
       ...c,
+      isIncome: c.commitmentType === 'income',
       status: c.startDate < todayStr ? 'atrasado' : 'soon',
       accountName: accounts?.find(a => a.id === c.accountId)?.name || 'Conta'
     }));
@@ -185,9 +186,12 @@ export default function Dashboard() {
                     {alerts.slice(0, 3).map((alert, i) => (
                       <div key={i} className="flex flex-col gap-1 text-xs border-b border-orange-500/10 pb-2 last:border-0 last:pb-0">
                         <div className="flex justify-between items-start gap-2">
-                          <p className="font-bold truncate text-foreground">{alert.description}</p>
-                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] whitespace-nowrap ${alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
-                            {alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
+                          <p className="font-bold truncate text-foreground">
+                            {alert.isIncome ? "📥 " : ""}{alert.description}
+                            {alert.recurrence === "SEMANAL" ? " (semanal)" : ""}
+                          </p>
+                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] whitespace-nowrap ${alert.isIncome ? 'bg-secondary/10 text-secondary' : alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
+                            {alert.isIncome ? 'A receber' : alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
                           </span>
                         </div>
                         <div className="flex justify-between items-center text-[10px]">

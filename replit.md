@@ -55,6 +55,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - All plans use one-time payment mode (no subscriptions)
 - Plan tier hierarchy: free < app < method < mentoria
 - Purchase sync endpoint: POST /api/stripe/sync-purchase
+- Webhook auto-updates planTier on `checkout.session.completed` (via payment_intent metadata or line item price lookup)
 
 ## File Structure
 - `shared/schema.ts` — Database schema, Zod schemas, types

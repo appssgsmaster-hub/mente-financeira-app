@@ -1,0 +1,116 @@
+We need to add a new financial awareness card to the dashboard called "Open Debts".
+
+Important rules:
+
+* Do NOT modify any existing financial logic, accounts, projections, Stripe integration, or layout structure.
+* Only add a new card component consistent with the existing dashboard design.
+* The feature must work for both personal and business users.
+
+CARD PURPOSE
+
+The goal is to help users become aware of their debts and create strategies to manage them while maintaining financial stability.
+
+CARD NAME
+
+Open Debts
+
+CARD DESCRIPTION
+
+"Understand your debts and build a strategy to regain financial control."
+
+CARD DATA STRUCTURE
+
+Each debt entry should include:
+
+• Creditor name
+• Current debt amount
+• Date the debt was registered
+• Priority level (Low / Medium / High)
+
+Important:
+Do NOT include a due date. The due date will be determined during the simulation strategy.
+
+CARD DISPLAY
+
+Inside the card show:
+
+• Total Outstanding Debt
+• Number of Active Debts
+
+Optional preview list (max 3 debts):
+
+Creditor
+Debt amount
+Priority
+
+If no debts exist show:
+
+"You currently have no registered debts."
+
+SIMULATION FEATURE
+
+Add a button inside the card:
+
+"Simulate Debt Strategy"
+
+When clicked, open a simulation modal.
+
+SIMULATION INPUTS
+
+• Total current debt (auto-calculated from the registered debts)
+• Monthly payment capacity (user input)
+
+SIMULATION LOGIC
+
+Calculate estimated payoff time:
+
+months_to_payoff = total_debt / monthly_payment_capacity
+
+Display:
+
+• Estimated months to eliminate debts
+
+PRIORITIZATION FEATURE
+
+Inside the simulation interface allow the user to select which debt should be prioritized.
+
+Example:
+
+Priority selector:
+
+High priority → pay first
+Medium priority
+Low priority
+
+The simulation should highlight the prioritized debt and show how focusing on it may accelerate the payoff strategy.
+
+LEARNING CTA
+
+Below the card add a learning section.
+
+Title:
+
+"Learn how to manage debts without losing your financial freedom."
+
+Text:
+
+"Debt should never define your future. Learn how to reorganize your finances, regain control of your cash flow, and focus on achieving your dreams."
+
+Button:
+
+"Learn More"
+
+The button should link to a placeholder page:
+
+/mentorship/debt-strategy
+
+DESIGN RULES
+
+• Follow the existing dashboard card style
+• Use the same fonts, spacing and color system
+• Do not introduce new dependencies or frameworks
+• Keep the logic lightweight and compatible with current financial features
+
+GOAL
+
+Provide awareness and strategic planning tools that encourage users to learn how to manage debts intelligently, while keeping the main focus on financial freedom and achieving life goals.

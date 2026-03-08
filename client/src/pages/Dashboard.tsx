@@ -78,11 +78,14 @@ export default function Dashboard() {
     } catch {}
   }, [user?.id]);
 
+  type DebtPriority = "high" | "medium" | "low";
+
   interface Debt {
     id: string;
     creditor: string;
     amount: number;
-    dueDate: string;
+    registeredDate: string;
+    priority: DebtPriority;
   }
 
   const debtsLsKey = user?.id ? `sgs_debts_v1_user_${user.id}` : "";
@@ -90,10 +93,10 @@ export default function Dashboard() {
   const [showDebtForm, setShowDebtForm] = useState(false);
   const [debtCreditor, setDebtCreditor] = useState("");
   const [debtAmount, setDebtAmount] = useState("");
-  const [debtDueDate, setDebtDueDate] = useState(new Date().toISOString().split("T")[0]);
+  const [debtPriority, setDebtPriority] = useState<DebtPriority>("medium");
   const [showSimModal, setShowSimModal] = useState(false);
-  const [simDebt, setSimDebt] = useState("");
   const [simPayment, setSimPayment] = useState("");
+  const [simPriorityFilter, setSimPriorityFilter] = useState<DebtPriority | "all">("all");
 
   useEffect(() => {
     if (!debtsLsKey) return;
@@ -101,7 +104,13 @@ export default function Dashboard() {
       const raw = localStorage.getItem(debtsLsKey);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setDebts(parsed);
+        if (Array.isArray(parsed)) {
+          setDebts(parsed.map((d: any) => ({
+            ...d,
+            priority: d.priority || "medium",
+            registeredDate: d.registeredDate || d.dueDate || new Date().toISOString().split("T")[0],
+          })));
+        }
       }
     } catch {}
   }, [debtsLsKey]);
@@ -118,12 +127,13 @@ export default function Dashboard() {
       id: crypto.randomUUID(),
       creditor: debtCreditor,
       amount: Math.round(val * 100),
-      dueDate: debtDueDate,
+      registeredDate: new Date().toISOString().split("T")[0],
+      priority: debtPriority,
     };
     saveDebts([...debts, newDebt]);
     setDebtCreditor("");
     setDebtAmount("");
-    setDebtDueDate(new Date().toISOString().split("T")[0]);
+    setDebtPriority("medium");
     setShowDebtForm(false);
   }
 
@@ -133,11 +143,35 @@ export default function Dashboard() {
 
   const totalDebt = debts.reduce((sum, d) => sum + d.amount, 0);
 
+  const priorityOrder: Record<DebtPriority, number> = { high: 0, medium: 1, low: 2 };
+  const priorityLabel: Record<DebtPriority, string> = { high: "Alta", medium: "Média", low: "Baixa" };
+  const priorityColor: Record<DebtPriority, string> = {
+    high: "bg-destructive/10 text-destructive",
+    medium: "bg-amber-500/10 text-amber-600",
+    low: "bg-muted text-muted-foreground",
+  };
+
+  const sortedDebts = [...debts].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
   function calcSimMonths() {
-    const debt = parseFloat(simDebt.replace(/\./g, "").replace(",", "."));
     const payment = parseFloat(simPayment.replace(/\./g, "").replace(",", "."));
-    if (!debt || !payment || payment <= 0) return null;
-    return Math.ceil(debt / payment);
+    if (!payment || payment <= 0 || totalDebt <= 0) return null;
+    const debtInUnits = totalDebt / 100;
+    return Math.ceil(debtInUnits / payment);
+  }
+
+  function getSimDebtsForPriority() {
+    if (simPriorityFilter === "all") return sortedDebts;
+    return sortedDebts.filter((d) => d.priority === simPriorityFilter);
+  }
+
+  function calcPriorityMonths() {
+    const payment = parseFloat(simPayment.replace(/\./g, "").replace(",", "."));
+    if (!payment || payment <= 0) return null;
+    const filtered = getSimDebtsForPriority();
+    const filteredTotal = filtered.reduce((sum, d) => sum + d.amount, 0);
+    if (filteredTotal <= 0) return null;
+    return Math.ceil((filteredTotal / 100) / payment);
   }
 
   const alerts = useMemo(() => {
@@ -411,13 +445,16 @@ export default function Dashboard() {
                 onChange={(e) => setDebtAmount(e.target.value)}
                 data-testid="input-debt-amount"
               />
-              <input
-                type="date"
+              <select
                 className="w-full p-3 rounded-xl border border-input bg-background text-sm"
-                value={debtDueDate}
-                onChange={(e) => setDebtDueDate(e.target.value)}
-                data-testid="input-debt-due-date"
-              />
+                value={debtPriority}
+                onChange={(e) => setDebtPriority(e.target.value as DebtPriority)}
+                data-testid="select-debt-priority"
+              >
+                <option value="high">Alta Prioridade</option>
+                <option value="medium">Média Prioridade</option>
+                <option value="low">Baixa Prioridade</option>
+              </select>
             </div>
             <div className="flex gap-2">
               <Button size="sm" className="rounded-xl text-xs" onClick={addDebt} data-testid="button-save-debt">Salvar</Button>
@@ -439,11 +476,16 @@ export default function Dashboard() {
 
         {debts.length > 0 ? (
           <div className="space-y-2 mb-4">
-            {debts.slice(0, 3).map((d) => (
+            {sortedDebts.slice(0, 3).map((d) => (
               <div key={d.id} className="flex items-center justify-between bg-muted/20 border border-border/50 rounded-xl px-4 py-3" data-testid={`row-debt-${d.id}`}>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm text-foreground truncate" data-testid={`text-debt-creditor-${d.id}`}>{d.creditor}</p>
-                  <p className="text-[10px] text-muted-foreground">Vencimento: {new Date(d.dueDate + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm text-foreground truncate" data-testid={`text-debt-creditor-${d.id}`}>{d.creditor}</p>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${priorityColor[d.priority]}`} data-testid={`badge-debt-priority-${d.id}`}>
+                      {priorityLabel[d.priority]}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Registrada em: {new Date(d.registeredDate + "T12:00:00").toLocaleDateString("pt-BR")}</p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0 ml-3">
                   <span className="font-display font-bold text-sm text-destructive" data-testid={`text-debt-amount-${d.id}`}>{formatValue(d.amount)}</span>
@@ -467,7 +509,7 @@ export default function Dashboard() {
         <Button
           variant="outline"
           className="w-full rounded-2xl border-primary/30 text-primary font-bold text-sm"
-          onClick={() => { setSimDebt(""); setSimPayment(""); setShowSimModal(true); }}
+          onClick={() => { setSimPayment(""); setSimPriorityFilter("all"); setShowSimModal(true); }}
           data-testid="button-simulate-debt"
         >
           <Calculator className="w-4 h-4 mr-2" /> Simular Estratégia de Dívidas
@@ -497,10 +539,10 @@ export default function Dashboard() {
       {/* SIMULATION MODAL */}
       {showSimModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowSimModal(false)}>
-          <Card className="w-full max-w-md p-6 rounded-3xl shadow-2xl relative" onClick={(e) => e.stopPropagation()} data-testid="modal-debt-simulation">
-            <button onClick={() => setShowSimModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground" data-testid="button-close-simulation">
+          <Card className="w-full max-w-lg p-6 rounded-3xl shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} data-testid="modal-debt-simulation">
+            <Button variant="ghost" size="icon" className="absolute top-4 right-4 w-8 h-8" onClick={() => setShowSimModal(false)} data-testid="button-close-simulation">
               <X className="w-5 h-5" />
-            </button>
+            </Button>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Calculator className="w-5 h-5 text-primary" />
@@ -508,16 +550,12 @@ export default function Dashboard() {
               <h3 className="font-display font-bold text-lg">Simulação de Dívidas</h3>
             </div>
             <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Valor total da dívida</label>
-                <input
-                  placeholder="Ex: 5.000,00"
-                  className="w-full p-3 rounded-xl border border-input bg-background text-sm"
-                  value={simDebt}
-                  onChange={(e) => setSimDebt(e.target.value)}
-                  data-testid="input-sim-debt"
-                />
+              <div className="bg-destructive/5 border border-destructive/15 rounded-2xl p-4">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Dívida total registrada</p>
+                <p className="text-2xl font-display font-bold text-destructive" data-testid="text-sim-total-debt">{formatValue(totalDebt)}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{debts.length} {debts.length === 1 ? "dívida ativa" : "dívidas ativas"}</p>
               </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Capacidade de pagamento mensal</label>
                 <input
@@ -528,6 +566,7 @@ export default function Dashboard() {
                   data-testid="input-sim-payment"
                 />
               </div>
+
               {(() => {
                 const months = calcSimMonths();
                 if (months === null) return null;
@@ -535,7 +574,7 @@ export default function Dashboard() {
                 const remainingMonths = months % 12;
                 return (
                   <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 text-center space-y-1" data-testid="text-sim-result">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Prazo estimado para quitar</p>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Prazo estimado para quitar tudo</p>
                     <p className="text-3xl font-display font-bold text-primary">
                       {months} {months === 1 ? "mês" : "meses"}
                     </p>
@@ -547,6 +586,68 @@ export default function Dashboard() {
                   </div>
                 );
               })()}
+
+              {debts.length > 0 && (
+                <div className="space-y-3 pt-2 border-t border-border">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Priorizar por nível</label>
+                    <div className="flex p-1 bg-muted rounded-xl">
+                      {([["all", "Todas"], ["high", "Alta"], ["medium", "Média"], ["low", "Baixa"]] as const).map(([val, label]) => (
+                        <button
+                          key={val}
+                          onClick={() => setSimPriorityFilter(val)}
+                          className={`flex-1 rounded-lg text-xs font-bold py-2 transition-all ${simPriorityFilter === val ? "bg-white dark:bg-background shadow-sm text-primary" : "text-muted-foreground"}`}
+                          data-testid={`btn-sim-priority-${val}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {simPriorityFilter !== "all" && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Dívidas com prioridade <strong>{priorityLabel[simPriorityFilter]}</strong>:
+                      </p>
+                      {getSimDebtsForPriority().length > 0 ? (
+                        <>
+                          {getSimDebtsForPriority().map((d) => (
+                            <div key={d.id} className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2" data-testid={`sim-debt-row-${d.id}`}>
+                              <span className="text-sm font-medium truncate">{d.creditor}</span>
+                              <span className="text-sm font-bold text-destructive shrink-0 ml-2">{formatValue(d.amount)}</span>
+                            </div>
+                          ))}
+                          {(() => {
+                            const months = calcPriorityMonths();
+                            if (months === null) return null;
+                            const filteredTotal = getSimDebtsForPriority().reduce((s, d) => s + d.amount, 0);
+                            const years = Math.floor(months / 12);
+                            const rem = months % 12;
+                            return (
+                              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-center space-y-1" data-testid="text-sim-priority-result">
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                  Foco: Prioridade {priorityLabel[simPriorityFilter]} ({formatValue(filteredTotal)})
+                                </p>
+                                <p className="text-2xl font-display font-bold text-amber-600">
+                                  {months} {months === 1 ? "mês" : "meses"}
+                                </p>
+                                {years >= 1 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    ({years} {years === 1 ? "ano" : "anos"}{rem > 0 ? ` e ${rem} ${rem === 1 ? "mês" : "meses"}` : ""})
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic text-center py-2">Nenhuma dívida com esta prioridade.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </Card>
         </div>

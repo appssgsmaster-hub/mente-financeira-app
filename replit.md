@@ -31,6 +31,8 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - Commitment linking: expenses and income can be linked to open commitments, marking them as paid/received
 - Redistribute balances: toggle in Settings to redistribute ecosystem balance when changing percentages
 - Dashboard with alerts and motivational messages (shows both expense and income alerts)
+- Open Debts card: debt tracking (localStorage), total debt display, simulation modal (months to pay off), learning CTA
+- Debt Strategy page (/mentorship/debt-strategy): educational content on debt management strategies
 - AI Mentor: dynamic motivational messages based on financial context
 - PWA (Progressive Web App): installable on mobile/desktop, offline-capable
 - Fully mobile-responsive layout across all pages

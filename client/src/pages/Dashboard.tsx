@@ -18,6 +18,11 @@ import {
   Sparkles,
   Brain,
   ArrowRight,
+  CreditCard,
+  Calculator,
+  X,
+  Trash2,
+  GraduationCap,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -72,6 +77,68 @@ export default function Dashboard() {
       }
     } catch {}
   }, [user?.id]);
+
+  interface Debt {
+    id: string;
+    creditor: string;
+    amount: number;
+    dueDate: string;
+  }
+
+  const debtsLsKey = user?.id ? `sgs_debts_v1_user_${user.id}` : "";
+  const [debts, setDebts] = useState<Debt[]>([]);
+  const [showDebtForm, setShowDebtForm] = useState(false);
+  const [debtCreditor, setDebtCreditor] = useState("");
+  const [debtAmount, setDebtAmount] = useState("");
+  const [debtDueDate, setDebtDueDate] = useState(new Date().toISOString().split("T")[0]);
+  const [showSimModal, setShowSimModal] = useState(false);
+  const [simDebt, setSimDebt] = useState("");
+  const [simPayment, setSimPayment] = useState("");
+
+  useEffect(() => {
+    if (!debtsLsKey) return;
+    try {
+      const raw = localStorage.getItem(debtsLsKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setDebts(parsed);
+      }
+    } catch {}
+  }, [debtsLsKey]);
+
+  function saveDebts(updated: Debt[]) {
+    setDebts(updated);
+    if (debtsLsKey) localStorage.setItem(debtsLsKey, JSON.stringify(updated));
+  }
+
+  function addDebt() {
+    const val = parseFloat(debtAmount.replace(/\./g, "").replace(",", "."));
+    if (!debtCreditor || !val || val <= 0) return;
+    const newDebt: Debt = {
+      id: crypto.randomUUID(),
+      creditor: debtCreditor,
+      amount: Math.round(val * 100),
+      dueDate: debtDueDate,
+    };
+    saveDebts([...debts, newDebt]);
+    setDebtCreditor("");
+    setDebtAmount("");
+    setDebtDueDate(new Date().toISOString().split("T")[0]);
+    setShowDebtForm(false);
+  }
+
+  function removeDebt(id: string) {
+    saveDebts(debts.filter((d) => d.id !== id));
+  }
+
+  const totalDebt = debts.reduce((sum, d) => sum + d.amount, 0);
+
+  function calcSimMonths() {
+    const debt = parseFloat(simDebt.replace(/\./g, "").replace(",", "."));
+    const payment = parseFloat(simPayment.replace(/\./g, "").replace(",", "."));
+    if (!debt || !payment || payment <= 0) return null;
+    return Math.ceil(debt / payment);
+  }
 
   const alerts = useMemo(() => {
     const now = new Date();
@@ -303,6 +370,187 @@ export default function Dashboard() {
           </Card>
         </div>
       ) : null}
+
+      {/* DÍVIDAS ABERTAS */}
+      <Card className="p-6 rounded-3xl border-border shadow-sm" data-testid="card-open-debts">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <CreditCard className="w-5 h-5 text-destructive" />
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-lg text-foreground" data-testid="text-debts-title">Dívidas Abertas</h3>
+              <p className="text-xs text-muted-foreground">Entenda suas dívidas e crie uma estratégia para retomar o controle financeiro.</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full text-xs shrink-0"
+            onClick={() => setShowDebtForm(!showDebtForm)}
+            data-testid="button-add-debt"
+          >
+            <PlusCircle className="w-3.5 h-3.5 mr-1" /> Adicionar
+          </Button>
+        </div>
+
+        {showDebtForm && (
+          <div className="bg-muted/30 border border-border rounded-2xl p-4 mb-4 space-y-3" data-testid="form-add-debt">
+            <input
+              placeholder="Credor (ex: Banco, Loja...)"
+              className="w-full p-3 rounded-xl border border-input bg-background text-sm"
+              value={debtCreditor}
+              onChange={(e) => setDebtCreditor(e.target.value)}
+              data-testid="input-debt-creditor"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                placeholder="Valor (ex: 1.500,00)"
+                className="w-full p-3 rounded-xl border border-input bg-background text-sm"
+                value={debtAmount}
+                onChange={(e) => setDebtAmount(e.target.value)}
+                data-testid="input-debt-amount"
+              />
+              <input
+                type="date"
+                className="w-full p-3 rounded-xl border border-input bg-background text-sm"
+                value={debtDueDate}
+                onChange={(e) => setDebtDueDate(e.target.value)}
+                data-testid="input-debt-due-date"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" className="rounded-xl text-xs" onClick={addDebt} data-testid="button-save-debt">Salvar</Button>
+              <Button size="sm" variant="ghost" className="rounded-xl text-xs" onClick={() => setShowDebtForm(false)}>Cancelar</Button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="bg-destructive/5 border border-destructive/15 rounded-2xl p-4">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Dívida Total</p>
+            <p className="text-xl font-display font-bold text-destructive" data-testid="text-total-debt">{formatValue(totalDebt)}</p>
+          </div>
+          <div className="bg-muted/30 border border-border rounded-2xl p-4">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Dívidas Ativas</p>
+            <p className="text-xl font-display font-bold text-foreground" data-testid="text-active-debts">{debts.length}</p>
+          </div>
+        </div>
+
+        {debts.length > 0 ? (
+          <div className="space-y-2 mb-4">
+            {debts.slice(0, 3).map((d) => (
+              <div key={d.id} className="flex items-center justify-between bg-muted/20 border border-border/50 rounded-xl px-4 py-3" data-testid={`row-debt-${d.id}`}>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm text-foreground truncate" data-testid={`text-debt-creditor-${d.id}`}>{d.creditor}</p>
+                  <p className="text-[10px] text-muted-foreground">Vencimento: {new Date(d.dueDate + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 ml-3">
+                  <span className="font-display font-bold text-sm text-destructive" data-testid={`text-debt-amount-${d.id}`}>{formatValue(d.amount)}</span>
+                  <Button variant="ghost" size="icon" className="w-7 h-7 text-muted-foreground" onClick={() => removeDebt(d.id)} data-testid={`button-remove-debt-${d.id}`}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {debts.length > 3 && (
+              <p className="text-[10px] text-center text-muted-foreground italic">+{debts.length - 3} outras dívidas</p>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 bg-muted/20 border border-border/50 rounded-xl px-4 py-4 mb-4" data-testid="text-no-debts">
+            <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+            <p className="text-xs text-muted-foreground">Você não tem dívidas registradas.</p>
+          </div>
+        )}
+
+        <Button
+          variant="outline"
+          className="w-full rounded-2xl border-primary/30 text-primary font-bold text-sm"
+          onClick={() => { setSimDebt(""); setSimPayment(""); setShowSimModal(true); }}
+          data-testid="button-simulate-debt"
+        >
+          <Calculator className="w-4 h-4 mr-2" /> Simular Estratégia de Dívidas
+        </Button>
+      </Card>
+
+      {/* CTA Aprendizado */}
+      <Card className="p-6 rounded-3xl border-secondary/20 bg-gradient-to-br from-secondary/5 via-transparent to-primary/5" data-testid="card-debt-learning">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center shrink-0">
+            <GraduationCap className="w-6 h-6 text-secondary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-display font-bold text-foreground mb-1">Aprenda a gerenciar dívidas sem perder sua liberdade financeira.</h4>
+            <p className="text-sm text-muted-foreground">Dívida não deve definir sua vida. Aprenda estratégias para reorganizar suas finanças, retomar o controle do seu fluxo de caixa e focar em realizar seus sonhos.</p>
+          </div>
+          <Button
+            className="rounded-2xl bg-secondary text-white font-bold text-sm shrink-0"
+            onClick={() => navigate("/mentorship/debt-strategy")}
+            data-testid="button-learn-debt-strategy"
+          >
+            Saiba Mais <ArrowRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      </Card>
+
+      {/* SIMULATION MODAL */}
+      {showSimModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowSimModal(false)}>
+          <Card className="w-full max-w-md p-6 rounded-3xl shadow-2xl relative" onClick={(e) => e.stopPropagation()} data-testid="modal-debt-simulation">
+            <button onClick={() => setShowSimModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground" data-testid="button-close-simulation">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Calculator className="w-5 h-5 text-primary" />
+              </div>
+              <h3 className="font-display font-bold text-lg">Simulação de Dívidas</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Valor total da dívida</label>
+                <input
+                  placeholder="Ex: 5.000,00"
+                  className="w-full p-3 rounded-xl border border-input bg-background text-sm"
+                  value={simDebt}
+                  onChange={(e) => setSimDebt(e.target.value)}
+                  data-testid="input-sim-debt"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Capacidade de pagamento mensal</label>
+                <input
+                  placeholder="Ex: 500,00"
+                  className="w-full p-3 rounded-xl border border-input bg-background text-sm"
+                  value={simPayment}
+                  onChange={(e) => setSimPayment(e.target.value)}
+                  data-testid="input-sim-payment"
+                />
+              </div>
+              {(() => {
+                const months = calcSimMonths();
+                if (months === null) return null;
+                const years = Math.floor(months / 12);
+                const remainingMonths = months % 12;
+                return (
+                  <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 text-center space-y-1" data-testid="text-sim-result">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Prazo estimado para quitar</p>
+                    <p className="text-3xl font-display font-bold text-primary">
+                      {months} {months === 1 ? "mês" : "meses"}
+                    </p>
+                    {years >= 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        ({years} {years === 1 ? "ano" : "anos"}{remainingMonths > 0 ? ` e ${remainingMonths} ${remainingMonths === 1 ? "mês" : "meses"}` : ""})
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* SUAS CONTAS */}
       <div>

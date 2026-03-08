@@ -15,6 +15,7 @@ import Payments from "./pages/Payments";
 import Education from "./pages/Education";
 import Plans from "./pages/Plans";
 import MentoriaWelcome from "./pages/MentoriaWelcome";
+import DebtStrategy from "./pages/DebtStrategy";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUse from "./pages/TermsOfUse";
 import { Loader2 } from "lucide-react";
@@ -76,6 +77,7 @@ function AppRoutes() {
         <Route path="/educacao" component={Education} />
         <Route path="/planos" component={Plans} />
         <Route path="/mentoria/boas-vindas" component={MentoriaWelcome} />
+        <Route path="/mentorship/debt-strategy" component={DebtStrategy} />
         <Route component={NotFound} />
       </Switch>
     </MainLayout>

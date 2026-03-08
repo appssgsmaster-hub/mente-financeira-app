@@ -411,7 +411,7 @@ export default function Projections() {
       </div>
 
       {incomeCommitments.length > 0 && (
-        <Card className="rounded-3xl border border-secondary/30 shadow-sm overflow-hidden">
+        <Card className="rounded-3xl border border-secondary/30 shadow-sm overflow-hidden" data-testid="card-income-section">
           <div className="p-5 flex items-center justify-between cursor-pointer hover:bg-muted/5 transition-colors" onClick={() => setOpenIncomeSection(!openIncomeSection)}>
             <div className="flex items-center gap-4">
               <div className="w-3 h-10 rounded-full bg-secondary" />
@@ -482,6 +482,22 @@ export default function Projections() {
           )}
         </Card>
       )}
+
+      <Card className="rounded-3xl border border-destructive/30 shadow-sm overflow-hidden" data-testid="card-expense-summary">
+        <div className="p-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-3 h-10 rounded-full bg-destructive" />
+            <div>
+              <h4 className="font-display font-bold text-lg">Taxas & Obrigações</h4>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Total de compromissos no mês</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="font-display font-bold text-xl text-destructive" data-testid="text-expense-summary-total">{formatCurrency(totalExpenseCommitted)}</span>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </div>
+        </div>
+      </Card>
 
       <div className="space-y-4">
         {accounts?.map((acc) => {

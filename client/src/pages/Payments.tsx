@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowUpRight, Receipt, Pencil, Trash2, PlusCircle, Globe, Link2 } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Receipt, Pencil, Trash2, PlusCircle, Globe, Link2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -355,15 +355,22 @@ export default function Payments() {
                 data-testid="input-tx-date"
               />
             </div>
-            <select
-              className="w-full p-3 rounded-2xl border border-input bg-background"
-              value={selectedAcc}
-              onChange={e => setSelectedAcc(e.target.value)}
-              data-testid="select-account"
-            >
-              <option value="">Selecione a conta (apenas para Saídas)</option>
-              {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            {getLinkedCommitmentType() === "income" ? (
+              <div className="w-full p-3 rounded-2xl border border-secondary/30 bg-secondary/5 flex items-center gap-2 text-sm font-medium text-secondary" data-testid="income-ecosystem-info">
+                <ArrowDownRight className="w-4 h-4 shrink-0" />
+                Ecossistema Total → distribuído automaticamente entre as contas
+              </div>
+            ) : (
+              <select
+                className="w-full p-3 rounded-2xl border border-input bg-background"
+                value={selectedAcc}
+                onChange={e => setSelectedAcc(e.target.value)}
+                data-testid="select-account"
+              >
+                <option value="">Selecione a conta (apenas para Saídas)</option>
+                {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            )}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <Button
                 className="flex-1 rounded-2xl bg-secondary hover:bg-secondary/90 text-white text-sm sm:text-base py-2.5 sm:py-3"

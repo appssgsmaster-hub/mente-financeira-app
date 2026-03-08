@@ -645,10 +645,11 @@ export default function Projections() {
 
                 {commitmentType === "income" && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Conta de Destino</label>
-                    <select className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium appearance-none cursor-pointer" value={String(accountId)} onChange={e => setAccountId(Number(e.target.value))} data-testid="select-commitment-account">
-                      {accounts?.map(a => <option key={a.id} value={String(a.id)}>{a.name}</option>)}
-                    </select>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Destino</label>
+                    <div className="w-full h-14 px-5 rounded-2xl border border-secondary/30 bg-secondary/5 flex items-center gap-2 font-medium text-secondary" data-testid="income-destination-info">
+                      <ArrowDownRight className="w-4 h-4" />
+                      Ecossistema Total → distribuído automaticamente
+                    </div>
                   </div>
                 )}
 

@@ -198,30 +198,53 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 pb-12">
-      {/* 1 — ECOSSISTEMA TOTAL */}
+      {/* 1 — ECOSSISTEMA TOTAL + DONUT ROW */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-xl border-0 bg-white dark:bg-card overflow-hidden relative">
-          <div className="flex items-start justify-between gap-2 sm:gap-4">
+        <Card className="p-5 sm:p-8 rounded-2xl sm:rounded-3xl shadow-xl border border-primary/10 bg-gradient-to-br from-primary/[0.03] via-white to-secondary/[0.04] dark:from-primary/[0.06] dark:via-card dark:to-secondary/[0.06] overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-primary/60" />
+          <div className="flex items-start justify-between gap-2 sm:gap-4 mt-1">
             <div className="min-w-0">
-              <p className="text-xs sm:text-sm uppercase tracking-wider text-muted-foreground mb-1 sm:mb-2">
-                Ecossistema Total
-              </p>
+              <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Wallet className="w-4 h-4 text-primary" />
+                </div>
+                <p className="text-xs sm:text-sm uppercase tracking-wider text-muted-foreground font-semibold">
+                  Ecossistema Total
+                </p>
+              </div>
 
               <h2
                 className="font-display font-bold text-foreground tracking-tight"
                 style={{
-                  fontSize: "clamp(22px, 3.2vw, 44px)",
+                  fontSize: "clamp(24px, 3.2vw, 44px)",
                   lineHeight: 1.05,
                 }}
               >
                 {formatValue(totalBalance)}
               </h2>
+
+              <div className="flex items-center gap-4 mt-3">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-5 h-5 rounded-full bg-secondary/10 flex items-center justify-center">
+                    <ArrowUpRight className="w-3 h-3 text-secondary" />
+                  </div>
+                  <span className="text-muted-foreground">Entradas:</span>
+                  <span className="font-bold text-secondary">{formatValue(monthlyIncome)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-5 h-5 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <ArrowDownRight className="w-3 h-3 text-destructive" />
+                  </div>
+                  <span className="text-muted-foreground">Saídas:</span>
+                  <span className="font-bold text-destructive">{formatValue(monthlyExpense)}</span>
+                </div>
+              </div>
             </div>
 
             <Button
               variant="outline"
               size="sm"
-              className="rounded-full bg-white/60 dark:bg-black/40 backdrop-blur-sm border-white/20 shadow-sm text-xs sm:text-sm shrink-0"
+              className="rounded-full bg-white/60 dark:bg-black/40 backdrop-blur-sm border-border/50 shadow-sm text-xs sm:text-sm shrink-0"
             >
               <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Exportar PDF</span>
@@ -229,8 +252,8 @@ export default function Dashboard() {
             </Button>
           </div>
 
-          {/* 2 — ECOSYSTEM ALERTS (only expense commitments) */}
-          <div className="mt-6">
+          {/* ECOSYSTEM ALERTS (only expense commitments) */}
+          <div className="mt-5">
             <div className="w-full">
               {expenseAlerts.length > 0 ? (
                 <div className="w-full bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 space-y-3 min-h-[100px]">
@@ -274,119 +297,160 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* 3 — DONUT (Distribuição Ideal) */}
-        <Card className="p-6 rounded-3xl border-0 shadow-xl shadow-black/5 bg-white dark:bg-card flex flex-col justify-center items-center">
-          <h3 className="font-display font-semibold text-lg text-center mb-2">
-            Distribuição Ideal
-          </h3>
+        {/* RIGHT COLUMN: Donut + Accounts Receivable stacked */}
+        <div className="flex flex-col gap-6">
+          {/* DONUT (Distribuição Ideal) */}
+          <Card className="p-6 rounded-3xl border-0 shadow-xl shadow-black/5 bg-white dark:bg-card flex flex-col justify-center items-center flex-1">
+            <h3 className="font-display font-semibold text-lg text-center mb-2">
+              Distribuição Ideal
+            </h3>
 
-          <div className="h-[220px] w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={70}
-                  outerRadius={92}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <RechartsTooltip
-                  formatter={(value: number, _name, props: any) => [
-                    `${value}%`,
-                    props?.payload?.name || "Conta",
-                  ]}
-                  contentStyle={{
-                    borderRadius: "12px",
-                    border: "none",
-                    boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="h-[180px] w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={82}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip
+                    formatter={(value: number, _name, props: any) => [
+                      `${value}%`,
+                      props?.payload?.name || "Conta",
+                    ]}
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
 
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span className="text-2xl font-display font-bold text-foreground">
-                100%
-              </span>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-2xl font-display font-bold text-foreground">
+                  100%
+                </span>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+
+          {/* ACCOUNTS RECEIVABLE (below donut) */}
+          <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-accounts-receivable">
+            <button
+              className="w-full p-4 flex items-center justify-between text-left"
+              onClick={() => setReceivablesOpen(!receivablesOpen)}
+              data-testid="button-toggle-receivables"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+                  <ArrowUpRight className="w-4 h-4 text-secondary" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground" data-testid="text-receivable-title">Accounts Receivable</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {incomeAlerts.length > 0
+                      ? `${incomeAlerts.length} ${incomeAlerts.length === 1 ? "recebimento pendente" : "recebimentos pendentes"}`
+                      : "Nenhum recebimento pendente"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {totalIncomeReceivable > 0 && (
+                  <span className="font-display font-bold text-base text-secondary" data-testid="text-receivable-total">{formatValue(totalIncomeReceivable)}</span>
+                )}
+                <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${receivablesOpen ? "rotate-180" : ""}`} />
+              </div>
+            </button>
+            {receivablesOpen && (
+              <div className="px-4 pb-4 space-y-3" data-testid="content-receivables-expanded">
+                {incomeAlerts.length > 0 ? (
+                  <div className="space-y-2">
+                    {incomeAlerts.map((item: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-secondary/5 border border-secondary/20">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm text-foreground truncate">{item.description}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {item.accountName}
+                            {item.recurrence === "SEMANAL" ? " · Semanal" : item.recurrence === "PARCELADO" ? ` · ${item.installments}x` : " · Mensal"}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-sm text-secondary">{formatValue(getMonthlyValue(item, currentMonthIndex, currentYear))}</p>
+                          <span className="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] mt-0.5 bg-secondary/10 text-secondary">A receber</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
+                    <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">Nenhum recebimento pendente para este mês.</p>
+                  </div>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full rounded-xl text-xs"
+                  onClick={() => navigate("/projecoes")}
+                  data-testid="button-go-to-receivables"
+                >
+                  Ver projeções de receita <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
       </div>
 
-      {/* 4 — ACCOUNTS RECEIVABLE */}
-      <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-accounts-receivable">
-        <button
-          className="w-full p-4 sm:p-5 flex items-center justify-between text-left"
-          onClick={() => setReceivablesOpen(!receivablesOpen)}
-          data-testid="button-toggle-receivables"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
-              <ArrowUpRight className="w-5 h-5 text-secondary" />
-            </div>
-            <div>
-              <h4 className="font-bold text-sm text-foreground" data-testid="text-receivable-title">Accounts Receivable</h4>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {incomeAlerts.length > 0
-                  ? `${incomeAlerts.length} ${incomeAlerts.length === 1 ? "recebimento pendente" : "recebimentos pendentes"} · ${formatValue(totalIncomeReceivable)}`
-                  : "Nenhum recebimento pendente"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {totalIncomeReceivable > 0 && (
-              <span className="font-display font-bold text-lg text-secondary" data-testid="text-receivable-total">{formatValue(totalIncomeReceivable)}</span>
-            )}
-            <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${receivablesOpen ? "rotate-180" : ""}`} />
-          </div>
-        </button>
-        {receivablesOpen && (
-          <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3" data-testid="content-receivables-expanded">
-            {incomeAlerts.length > 0 ? (
-              <div className="space-y-2">
-                {incomeAlerts.map((item: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-secondary/5 border border-secondary/20">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm text-foreground truncate">{item.description}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {item.accountName}
-                        {item.recurrence === "SEMANAL" ? " · Semanal" : item.recurrence === "PARCELADO" ? ` · ${item.installments}x` : " · Mensal"}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-bold text-sm text-secondary">{formatValue(getMonthlyValue(item, currentMonthIndex, currentYear))}</p>
-                      <span className="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] mt-0.5 bg-secondary/10 text-secondary">A receber</span>
-                    </div>
-                  </div>
-                ))}
+      {/* MENTORSHIP CTA CARDS (2 side by side, above accounts) */}
+      {(planTier === "free" || planTier === "app") && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card
+            className="p-4 sm:p-5 rounded-2xl border-amber-400/30 bg-gradient-to-r from-amber-50/50 to-amber-100/30 dark:from-amber-950/10 dark:to-amber-900/5 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate("/planos")}
+            data-testid="card-upgrade-mentoria"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Brain className="w-5 h-5 text-amber-500" />
               </div>
-            ) : (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
-                <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">Nenhum recebimento pendente para este mês.</p>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-sm text-foreground">Mentoria Transformação</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">3 meses de mentoria + tudo incluso por €697</p>
               </div>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full rounded-xl text-xs"
-              onClick={() => navigate("/projecoes")}
-              data-testid="button-go-to-receivables"
-            >
-              Ver projeções de receita <ArrowRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
-          </div>
-        )}
-      </Card>
+              <ArrowRight className="w-4 h-4 text-amber-500 shrink-0" />
+            </div>
+          </Card>
+          <Card
+            className="p-4 sm:p-5 rounded-2xl border-secondary/30 bg-gradient-to-r from-secondary/5 to-secondary/10 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate("/planos")}
+            data-testid="card-upgrade-method"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-secondary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-sm text-foreground">Método Mente Financeira</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">Treinamento completo + app</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
+            </div>
+          </Card>
+        </div>
+      )}
 
-      {/* 5 — SUAS CONTAS (Five Accounts) */}
+      {/* SUAS CONTAS (Five Accounts) */}
       <div>
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-display font-bold text-foreground">
@@ -448,44 +512,6 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
-
-      {/* MENTORSHIP CARDS */}
-      {(planTier === "free" || planTier === "app") && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card
-            className="p-4 sm:p-5 rounded-2xl border-amber-400/30 bg-gradient-to-r from-amber-50/50 to-amber-100/30 dark:from-amber-950/10 dark:to-amber-900/5 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => navigate("/planos")}
-            data-testid="card-upgrade-mentoria"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-                <Brain className="w-5 h-5 text-amber-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-sm text-foreground">Mentoria Transformação</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">3 meses de mentoria + tudo incluso por €697</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-amber-500 shrink-0" />
-            </div>
-          </Card>
-          <Card
-            className="p-4 sm:p-5 rounded-2xl border-secondary/30 bg-gradient-to-r from-secondary/5 to-secondary/10 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => navigate("/planos")}
-            data-testid="card-upgrade-method"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-secondary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-sm text-foreground">Método Mente Financeira</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">Treinamento completo + app</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
-            </div>
-          </Card>
-        </div>
-      )}
 
       {/* 6 — COLLAPSIBLE: UPCOMING COMMITMENTS (expense only, remaining unpaid) */}
       <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-commitments-collapsible">

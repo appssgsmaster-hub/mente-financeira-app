@@ -88,7 +88,7 @@ export default function Payments() {
   const [linkedCommitment, setLinkedCommitment] = useState<string>("");
 
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
   const editingTx = useMemo(
     () => (transactions || []).find((t: any) => t.id === editingId) || null,
     [transactions, editingId]

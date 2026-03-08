@@ -4,7 +4,7 @@ import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccounts, useTransactions } from "@/hooks/use-finance";
 import { getMentorMessage } from "@/lib/mentor-messages";
-import { Bell, Search, User as UserIcon, LogOut, Sparkles } from "lucide-react";
+import { User as UserIcon, LogOut, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -113,14 +113,6 @@ export function MainLayout({ children }: { children: ReactNode }) {
             </div>
             
             <div className="flex items-center gap-1 sm:gap-3 shrink-0">
-              <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 h-8 w-8 sm:h-10 sm:w-10">
-                <Search className="w-4 h-4 sm:w-5 sm:h-5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 relative h-8 w-8 sm:h-10 sm:w-10">
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="absolute top-1 right-1 sm:top-2 sm:right-2 w-2 h-2 bg-secondary rounded-full border-2 border-background"></span>
-              </Button>
-              <div className="w-px h-8 bg-border/50 mx-1 sm:mx-2 hidden sm:block"></div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="rounded-full gap-2 hidden sm:flex border-border/50 hover:bg-accent" data-testid="button-user-menu">

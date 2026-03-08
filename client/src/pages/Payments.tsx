@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowUpRight, ArrowDownRight, Receipt, Pencil, Trash2, PlusCircle, Globe, Link2 } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Receipt, Pencil, Trash2, PlusCircle, Globe, Link2, ChevronDown } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,7 @@ export default function Payments() {
   const [linkedCommitment, setLinkedCommitment] = useState<string>("");
 
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const editingTx = useMemo(
     () => (transactions || []).find((t: any) => t.id === editingId) || null,
     [transactions, editingId]
@@ -403,49 +404,68 @@ export default function Payments() {
         </Card>
       </div>
 
-      <Card className="rounded-3xl border border-border p-0 overflow-hidden">
-        <div className="p-6 border-b bg-muted/20">
-          <h2 className="font-bold text-xl">Histórico de Transações</h2>
-        </div>
-        <div className="divide-y divide-border">
-          {list.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground">Nenhuma transação encontrada.</div>
-          ) : (
-            list.map((tx) => {
-              const isIncome = tx.type === "income";
-              const accountName = tx.accountId != null ? accountsById.get(tx.accountId)?.name : "Ecossistema (Distribuído)";
-              return (
-                <div key={tx.id} className="p-3 sm:p-6 flex items-center justify-between hover:bg-muted/30 transition-colors gap-2 sm:gap-4">
-                  <div className="flex items-center gap-2 sm:gap-5 min-w-0 flex-1">
-                    <div className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl shrink-0 ${isIncome ? "bg-secondary/10 text-secondary" : "bg-destructive/10 text-destructive"}`}>
-                      {isIncome ? <ArrowUpRight className="w-4 h-4 sm:w-6 sm:h-6" /> : <Receipt className="w-4 h-4 sm:w-6 sm:h-6" />}
+      <Card className="rounded-3xl border border-border p-0 overflow-hidden" data-testid="card-transaction-history">
+        <button
+          className="w-full p-5 sm:p-6 flex items-center justify-between text-left bg-muted/20 border-b border-border"
+          onClick={() => setHistoryOpen(!historyOpen)}
+          data-testid="button-toggle-history"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Receipt className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-bold text-lg sm:text-xl text-foreground">Histórico de Transações</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {list.length > 0
+                  ? `${list.length} ${list.length === 1 ? "transação registrada" : "transações registradas"}`
+                  : "Nenhuma transação encontrada"}
+              </p>
+            </div>
+          </div>
+          <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${historyOpen ? "rotate-180" : ""}`} />
+        </button>
+        {historyOpen && (
+          <div className="divide-y divide-border" data-testid="content-history-expanded">
+            {list.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground">Nenhuma transação encontrada.</div>
+            ) : (
+              list.map((tx) => {
+                const isIncome = tx.type === "income";
+                const accountName = tx.accountId != null ? accountsById.get(tx.accountId)?.name : "Ecossistema (Distribuído)";
+                return (
+                  <div key={tx.id} className="p-3 sm:p-6 flex items-center justify-between hover:bg-muted/30 transition-colors gap-2 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-5 min-w-0 flex-1">
+                      <div className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl shrink-0 ${isIncome ? "bg-secondary/10 text-secondary" : "bg-destructive/10 text-destructive"}`}>
+                        {isIncome ? <ArrowUpRight className="w-4 h-4 sm:w-6 sm:h-6" /> : <Receipt className="w-4 h-4 sm:w-6 sm:h-6" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-foreground text-sm sm:text-lg truncate">{tx.description}</p>
+                        <div className="flex flex-col gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
+                          <p className="text-xs sm:text-sm text-muted-foreground">{format(new Date(tx.date), "dd/MM/yyyy", { locale: ptBR })}</p>
+                          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">{accountName}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-foreground text-sm sm:text-lg truncate">{tx.description}</p>
-                      <div className="flex flex-col gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
-                        <p className="text-xs sm:text-sm text-muted-foreground">{format(new Date(tx.date), "dd/MM/yyyy", { locale: ptBR })}</p>
-                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">{accountName}</p>
+                    <div className="flex items-center gap-1 sm:gap-6 shrink-0">
+                      <p className={`text-sm sm:text-xl font-bold whitespace-nowrap ${isIncome ? "text-secondary" : "text-destructive"}`}>
+                        {isIncome ? "+" : "-"} {formatCurrency(tx.amount, user?.currency)}
+                      </p>
+                      <div className="flex items-center gap-0 sm:gap-2">
+                        <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-10 sm:w-10" onClick={() => openEdit(tx)}>
+                          <Pencil className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-muted-foreground" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-10 sm:w-10 hover:text-destructive" onClick={() => handleDelete(tx.id)} disabled={isDeleting}>
+                          <Trash2 className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                        </Button>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 sm:gap-6 shrink-0">
-                    <p className={`text-sm sm:text-xl font-bold whitespace-nowrap ${isIncome ? "text-secondary" : "text-destructive"}`}>
-                      {isIncome ? "+" : "-"} {formatCurrency(tx.amount, user?.currency)}
-                    </p>
-                    <div className="flex items-center gap-0 sm:gap-2">
-                      <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-10 sm:w-10" onClick={() => openEdit(tx)}>
-                        <Pencil className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-muted-foreground" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-10 sm:w-10 hover:text-destructive" onClick={() => handleDelete(tx.id)} disabled={isDeleting}>
-                        <Trash2 className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </Card>
 
       {editingId && (

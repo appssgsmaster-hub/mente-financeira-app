@@ -5,13 +5,9 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { 
-  TrendingUp, 
-  TrendingDown, 
   Wallet, 
   ArrowUpRight, 
   ArrowDownRight,
-  PlusCircle, 
-  Download,
   RefreshCw,
   AlertCircle,
   Clock,
@@ -241,15 +237,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full bg-white/60 dark:bg-black/40 backdrop-blur-sm border-border/50 shadow-sm text-xs sm:text-sm shrink-0"
-            >
-              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Exportar PDF</span>
-              <span className="sm:hidden">PDF</span>
-            </Button>
           </div>
 
           {/* ECOSYSTEM ALERTS (only expense commitments) */}

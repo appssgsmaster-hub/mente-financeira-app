@@ -30,6 +30,23 @@ import {
   Tooltip as RechartsTooltip,
 } from "recharts";
 
+function weeklyOccurrencesInMonth(startDateStr: string, monthIndex: number, year: number) {
+  const startDate = new Date(startDateStr);
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 0);
+  const effectiveStart = startDate > monthStart ? startDate : monthStart;
+  if (effectiveStart > monthEnd) return 0;
+  const daysInRange = Math.floor((monthEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  return Math.ceil(daysInRange / 7);
+}
+
+function getMonthlyValue(c: any, monthIndex: number, year: number) {
+  if (c.recurrence === "SEMANAL") {
+    return c.value * weeklyOccurrencesInMonth(c.startDate, monthIndex, year);
+  }
+  return c.value;
+}
+
 export default function Dashboard() {
   const { data: accounts, isLoading: loadingAccounts } = useAccounts();
   const { data: transactions, isLoading: loadingTransactions } =
@@ -62,6 +79,7 @@ export default function Dashboard() {
 
   const [commitmentsOpen, setCommitmentsOpen] = useState(false);
   const [debtsOpen, setDebtsOpen] = useState(false);
+  const [receivablesOpen, setReceivablesOpen] = useState(false);
 
   const [commitments, setCommitments] = useState<any[]>([]);
   useEffect(() => {
@@ -93,43 +111,61 @@ export default function Dashboard() {
   const activeDebts = debts.filter((d) => !d.paid);
   const totalDebt = activeDebts.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
-  const alerts = useMemo(() => {
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const nextWeek = new Date();
-    nextWeek.setDate(now.getDate() + 7);
-    const nextWeekStr = nextWeek.toISOString().split('T')[0];
+  const now = new Date();
+  const currentMonthIndex = now.getMonth();
+  const currentYear = now.getFullYear();
+  const currentPeriod = `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}`;
 
-    const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const monthIndex = now.getMonth();
-    const year = now.getFullYear();
-    const msEnd = new Date(year, monthIndex + 1, 0).getTime();
+  const expenseAlerts = useMemo(() => {
+    const todayStr = now.toISOString().split('T')[0];
+    const msEnd = new Date(currentYear, currentMonthIndex + 1, 0).getTime();
 
     return commitments.filter(c => {
+      if ((c.commitmentType || "expense") !== "expense") return false;
       const paidPeriods: string[] = c.paidPeriods || [];
       if (paidPeriods.includes(currentPeriod)) return false;
 
       const d = new Date(c.startDate);
       const t = d.getTime();
-      let active = false;
       if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
-        active = t <= msEnd;
-      } else {
-        const n = Math.max(1, Number(c.installments ?? 1));
-        const diff = (year - d.getFullYear()) * 12 + (monthIndex - d.getMonth());
-        active = diff >= 0 && diff < n && t <= msEnd;
+        return t <= msEnd;
       }
-      return active;
+      const n = Math.max(1, Number(c.installments ?? 1));
+      const diff = (currentYear - d.getFullYear()) * 12 + (currentMonthIndex - d.getMonth());
+      return diff >= 0 && diff < n && t <= msEnd;
     }).map(c => ({
       ...c,
-      isIncome: c.commitmentType === 'income',
       status: c.startDate < todayStr ? 'atrasado' : 'soon',
-      accountName: accounts?.find(a => a.id === c.accountId)?.name || 'Conta'
+      accountName: accounts?.find((a: any) => a.id === c.accountId)?.name || 'Conta'
     }));
-  }, [commitments, accounts]);
+  }, [commitments, accounts, currentPeriod]);
 
-  // Filtrar apenas transações do mês atual para as mensagens dinâmicas
-  const now = new Date();
+  const incomeAlerts = useMemo(() => {
+    const msEnd = new Date(currentYear, currentMonthIndex + 1, 0).getTime();
+
+    return commitments.filter(c => {
+      if (c.commitmentType !== "income") return false;
+      const paidPeriods: string[] = c.paidPeriods || [];
+      if (paidPeriods.includes(currentPeriod)) return false;
+
+      const d = new Date(c.startDate);
+      const t = d.getTime();
+      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
+        return t <= msEnd;
+      }
+      const n = Math.max(1, Number(c.installments ?? 1));
+      const diff = (currentYear - d.getFullYear()) * 12 + (currentMonthIndex - d.getMonth());
+      return diff >= 0 && diff < n && t <= msEnd;
+    }).map(c => ({
+      ...c,
+      accountName: accounts?.find((a: any) => a.id === c.accountId)?.name || 'Conta'
+    }));
+  }, [commitments, accounts, currentPeriod]);
+
+  const totalIncomeReceivable = incomeAlerts.reduce((sum: number, c: any) => sum + getMonthlyValue(c, currentMonthIndex, currentYear), 0);
+
+  const totalExpenseRemaining = expenseAlerts.reduce((sum: number, c: any) => sum + getMonthlyValue(c, currentMonthIndex, currentYear), 0);
+
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   
   const monthlyIncome = transactions
@@ -162,9 +198,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Top Cards */}
+      {/* 1 — ECOSSISTEMA TOTAL */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ECOSSISTEMA TOTAL */}
         <Card className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-xl border-0 bg-white dark:bg-card overflow-hidden relative">
           <div className="flex items-start justify-between gap-2 sm:gap-4">
             <div className="min-w-0">
@@ -194,34 +229,34 @@ export default function Dashboard() {
             </Button>
           </div>
 
+          {/* 2 — ECOSYSTEM ALERTS (only expense commitments) */}
           <div className="mt-6">
-            {/* Card de Alertas/Compromissos */}
             <div className="w-full">
-              {alerts.length > 0 ? (
+              {expenseAlerts.length > 0 ? (
                 <div className="w-full bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 space-y-3 min-h-[100px]">
                   <div className="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
                     <AlertCircle className="w-4 h-4 shrink-0" /> Alertas do Ecossistema
                   </div>
                   <div className="space-y-3 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
-                    {alerts.slice(0, 3).map((alert, i) => (
+                    {expenseAlerts.slice(0, 3).map((alert, i) => (
                       <div key={i} className="flex flex-col gap-1 text-xs border-b border-orange-500/10 pb-2 last:border-0 last:pb-0">
                         <div className="flex justify-between items-start gap-2">
                           <p className="font-bold truncate text-foreground">
-                            {alert.isIncome ? "📥 " : ""}{alert.description}
+                            {alert.description}
                             {alert.recurrence === "SEMANAL" ? " (semanal)" : ""}
                           </p>
-                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] whitespace-nowrap ${alert.isIncome ? 'bg-secondary/10 text-secondary' : alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
-                            {alert.isIncome ? 'A receber' : alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
+                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] whitespace-nowrap ${alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
+                            {alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
                           </span>
                         </div>
                         <div className="flex justify-between items-center text-[10px]">
                           <span className="text-muted-foreground font-medium">{alert.accountName}</span>
-                          <span className="font-bold text-foreground">{formatValue(alert.value)}</span>
+                          <span className="font-bold text-foreground">{formatValue(getMonthlyValue(alert, currentMonthIndex, currentYear))}</span>
                         </div>
                       </div>
                     ))}
-                    {alerts.length > 3 && (
-                      <p className="text-[10px] text-center text-muted-foreground italic">+{alerts.length - 3} outros avisos</p>
+                    {expenseAlerts.length > 3 && (
+                      <p className="text-[10px] text-center text-muted-foreground italic">+{expenseAlerts.length - 3} outros avisos</p>
                     )}
                   </div>
                 </div>
@@ -239,7 +274,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* DONUT */}
+        {/* 3 — DONUT (Distribuição Ideal) */}
         <Card className="p-6 rounded-3xl border-0 shadow-xl shadow-black/5 bg-white dark:bg-card flex flex-col justify-center items-center">
           <h3 className="font-display font-semibold text-lg text-center mb-2">
             Distribuição Ideal
@@ -285,45 +320,73 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* MENTORSHIP CARDS - always 2 side by side */}
-      {(planTier === "free" || planTier === "app") && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card
-            className="p-4 sm:p-5 rounded-2xl border-amber-400/30 bg-gradient-to-r from-amber-50/50 to-amber-100/30 dark:from-amber-950/10 dark:to-amber-900/5 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => navigate("/planos")}
-            data-testid="card-upgrade-mentoria"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-                <Brain className="w-5 h-5 text-amber-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-sm text-foreground">Mentoria Transformação</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">3 meses de mentoria + tudo incluso por €697</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-amber-500 shrink-0" />
+      {/* 4 — ACCOUNTS RECEIVABLE */}
+      <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-accounts-receivable">
+        <button
+          className="w-full p-4 sm:p-5 flex items-center justify-between text-left"
+          onClick={() => setReceivablesOpen(!receivablesOpen)}
+          data-testid="button-toggle-receivables"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+              <ArrowUpRight className="w-5 h-5 text-secondary" />
             </div>
-          </Card>
-          <Card
-            className="p-4 sm:p-5 rounded-2xl border-secondary/30 bg-gradient-to-r from-secondary/5 to-secondary/10 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => navigate("/planos")}
-            data-testid="card-upgrade-method"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-secondary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-sm text-foreground">Método Mente Financeira</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">Treinamento completo + app</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
+            <div>
+              <h4 className="font-bold text-sm text-foreground" data-testid="text-receivable-title">Accounts Receivable</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {incomeAlerts.length > 0
+                  ? `${incomeAlerts.length} ${incomeAlerts.length === 1 ? "recebimento pendente" : "recebimentos pendentes"} · ${formatValue(totalIncomeReceivable)}`
+                  : "Nenhum recebimento pendente"}
+              </p>
             </div>
-          </Card>
-        </div>
-      )}
+          </div>
+          <div className="flex items-center gap-3">
+            {totalIncomeReceivable > 0 && (
+              <span className="font-display font-bold text-lg text-secondary" data-testid="text-receivable-total">{formatValue(totalIncomeReceivable)}</span>
+            )}
+            <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${receivablesOpen ? "rotate-180" : ""}`} />
+          </div>
+        </button>
+        {receivablesOpen && (
+          <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3" data-testid="content-receivables-expanded">
+            {incomeAlerts.length > 0 ? (
+              <div className="space-y-2">
+                {incomeAlerts.map((item: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-secondary/5 border border-secondary/20">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm text-foreground truncate">{item.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {item.accountName}
+                        {item.recurrence === "SEMANAL" ? " · Semanal" : item.recurrence === "PARCELADO" ? ` · ${item.installments}x` : " · Mensal"}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-bold text-sm text-secondary">{formatValue(getMonthlyValue(item, currentMonthIndex, currentYear))}</p>
+                      <span className="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] mt-0.5 bg-secondary/10 text-secondary">A receber</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
+                <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Nenhum recebimento pendente para este mês.</p>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full rounded-xl text-xs"
+              onClick={() => navigate("/projecoes")}
+              data-testid="button-go-to-receivables"
+            >
+              Ver projeções de receita <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+        )}
+      </Card>
 
-      {/* SUAS CONTAS */}
+      {/* 5 — SUAS CONTAS (Five Accounts) */}
       <div>
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-display font-bold text-foreground">
@@ -386,7 +449,45 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* COLLAPSIBLE: PRÓXIMOS COMPROMISSOS */}
+      {/* MENTORSHIP CARDS */}
+      {(planTier === "free" || planTier === "app") && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card
+            className="p-4 sm:p-5 rounded-2xl border-amber-400/30 bg-gradient-to-r from-amber-50/50 to-amber-100/30 dark:from-amber-950/10 dark:to-amber-900/5 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate("/planos")}
+            data-testid="card-upgrade-mentoria"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Brain className="w-5 h-5 text-amber-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-sm text-foreground">Mentoria Transformação</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">3 meses de mentoria + tudo incluso por €697</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-amber-500 shrink-0" />
+            </div>
+          </Card>
+          <Card
+            className="p-4 sm:p-5 rounded-2xl border-secondary/30 bg-gradient-to-r from-secondary/5 to-secondary/10 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate("/planos")}
+            data-testid="card-upgrade-method"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-secondary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-sm text-foreground">Método Mente Financeira</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">Treinamento completo + app</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* 6 — COLLAPSIBLE: UPCOMING COMMITMENTS (expense only, remaining unpaid) */}
       <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-commitments-collapsible">
         <button
           className="w-full p-4 sm:p-5 flex items-center justify-between text-left"
@@ -398,33 +499,38 @@ export default function Dashboard() {
               <Clock className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h4 className="font-bold text-sm text-foreground">Próximos Compromissos</h4>
+              <h4 className="font-bold text-sm text-foreground">Upcoming Commitments</h4>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {alerts.length > 0
-                  ? `${alerts.length} ${alerts.length === 1 ? "compromisso pendente" : "compromissos pendentes"}`
-                  : "resumo de compromissos futuros"}
+                {expenseAlerts.length > 0
+                  ? `Total a pagar este mês: ${formatValue(totalExpenseRemaining)}`
+                  : "Nenhum compromisso pendente"}
               </p>
             </div>
           </div>
-          <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${commitmentsOpen ? "rotate-180" : ""}`} />
+          <div className="flex items-center gap-3">
+            {totalExpenseRemaining > 0 && (
+              <span className="font-display font-bold text-lg text-destructive" data-testid="text-commitments-total">{formatValue(totalExpenseRemaining)}</span>
+            )}
+            <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${commitmentsOpen ? "rotate-180" : ""}`} />
+          </div>
         </button>
         {commitmentsOpen && (
           <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3" data-testid="content-commitments-expanded">
-            {alerts.length > 0 ? (
+            {expenseAlerts.length > 0 ? (
               <div className="space-y-2">
-                {alerts.map((alert, i) => (
+                {expenseAlerts.map((alert, i) => (
                   <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/30 border border-border/50">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-sm text-foreground truncate">
-                        {alert.isIncome ? "📥 " : ""}{alert.description}
+                        {alert.description}
                         {alert.recurrence === "SEMANAL" ? " (semanal)" : ""}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">{alert.accountName}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-bold text-sm text-foreground">{formatValue(alert.value)}</p>
-                      <span className={`inline-block px-2 py-0.5 rounded-full font-bold text-[10px] mt-0.5 ${alert.isIncome ? 'bg-secondary/10 text-secondary' : alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
-                        {alert.isIncome ? 'A receber' : alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
+                      <p className="font-bold text-sm text-foreground">{formatValue(getMonthlyValue(alert, currentMonthIndex, currentYear))}</p>
+                      <span className={`inline-block px-2 py-0.5 rounded-full font-bold text-[10px] mt-0.5 ${alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
+                        {alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
                       </span>
                     </div>
                   </div>
@@ -449,7 +555,7 @@ export default function Dashboard() {
         )}
       </Card>
 
-      {/* COLLAPSIBLE: DÍVIDAS ABERTAS */}
+      {/* 7 — COLLAPSIBLE: DÍVIDAS ABERTAS */}
       <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-open-debts">
         <button
           className="w-full p-4 sm:p-5 flex items-center justify-between text-left"
@@ -461,11 +567,11 @@ export default function Dashboard() {
               <CreditCard className="w-5 h-5 text-destructive" />
             </div>
             <div>
-              <h4 className="font-bold text-sm text-foreground" data-testid="text-debts-title">Dívidas Abertas</h4>
+              <h4 className="font-bold text-sm text-foreground" data-testid="text-debts-title">Open Debts</h4>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {activeDebts.length > 0
                   ? `${activeDebts.length} ${activeDebts.length === 1 ? "dívida ativa" : "dívidas ativas"} · ${formatValue(totalDebt)}`
-                  : "resumo das dívidas registradas"}
+                  : "Nenhuma dívida registrada"}
               </p>
             </div>
           </div>

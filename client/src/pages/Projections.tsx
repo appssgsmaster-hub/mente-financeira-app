@@ -488,12 +488,12 @@ export default function Projections() {
           <div className="flex items-center gap-4">
             <div className="w-3 h-10 rounded-full bg-destructive" />
             <div>
-              <h4 className="font-display font-bold text-lg">Taxas & Obrigações</h4>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Total de compromissos no mês</p>
+              <h4 className="font-display font-bold text-lg">Future Commitments</h4>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Restante a pagar no mês</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="font-display font-bold text-xl text-destructive" data-testid="text-expense-summary-total">{formatCurrency(totalExpenseCommitted)}</span>
+            <span className="font-display font-bold text-xl text-destructive" data-testid="text-expense-summary-total">{formatCurrency(totalExpenseOpen)}</span>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </div>
         </div>

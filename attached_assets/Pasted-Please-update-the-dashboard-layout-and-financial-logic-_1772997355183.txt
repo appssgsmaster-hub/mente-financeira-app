@@ -1,0 +1,157 @@
+Please update the dashboard layout and financial logic without modifying any existing business logic, Stripe integration, database schema, or calculations.
+
+This change is ONLY a UI layout correction and naming correction.
+
+Do NOT break any current functionality.
+
+1 — "Accounts Receivable" Card Position
+
+The Accounts Receivable card must appear:
+
+Position:
+Below the Ideal Distribution chart.
+
+Current problem:
+It was moved below the five accounts and renamed incorrectly.
+
+Fix:
+
+Card name must be:
+
+Accounts Receivable
+
+This card must show:
+
+Total amount to receive
+
+Inside the card:
+List of receivable items.
+
+This card must NOT appear below the five accounts.
+
+2 — Cards Below the Five Accounts
+
+Below the five accounts cards, there must be ONLY two dropdown cards:
+
+1️⃣ Upcoming Commitments
+2️⃣ Open Debts
+
+These two cards must stay together under the five accounts.
+
+3 — Upcoming Commitments Card
+
+Rename correctly:
+
+Upcoming Commitments
+
+This card must display:
+
+Total commitments to pay in the current month.
+
+Example display:
+
+Upcoming Commitments
+Total to pay this month: €X
+
+Inside the dropdown:
+List all commitments for the current month.
+
+Each commitment must show:
+
+Name
+Amount
+Status
+
+When a commitment is marked as paid:
+
+• It must be removed from the total value of the card
+• Paid values must continue being reflected in Monthly Expenses
+
+Important rule:
+
+The card must always show:
+
+Remaining commitments to pay.
+
+Not total commitments created.
+
+4 — Projection Page Correction
+
+Inside Projections, the commitments card was incorrectly renamed.
+
+Current incorrect name:
+
+Taxes & Obligations
+
+Fix:
+
+Rename back to:
+
+Future Commitments
+
+Also fix the logic:
+
+Currently it shows only already paid commitments.
+
+Correct behaviour:
+
+Show only remaining amount to pay.
+
+Paid commitments should NOT appear here.
+
+Paid commitments are already reflected in:
+
+Monthly Expenses.
+
+5 — Ecosystem Alert Card
+
+Inside Ecosystem Alerts, remove receivable alerts.
+
+Currently showing:
+
+Receivable payments.
+
+Correct behaviour:
+
+This alert section must show ONLY:
+
+Commitments that need to be paid in the current month.
+
+Examples of alerts:
+
+Upcoming payments
+Pending commitments
+
+Do NOT show receivables here.
+
+6 — Final Dashboard Layout (Correct Order)
+
+Dashboard must follow this order:
+
+1️⃣ Ecosystem Total card
+
+2️⃣ Ecosystem Alerts (only commitments to pay)
+
+3️⃣ Ideal Distribution chart
+
+4️⃣ Accounts Receivable card
+
+5️⃣ Five Accounts cards
+
+6️⃣ Upcoming Commitments (dropdown)
+
+7️⃣ Open Debts (dropdown)
+
+Important Safety Rules
+
+Do NOT modify:
+
+• Stripe payments
+• Database structure
+• Financial calculations
+• User authentication
+• Existing APIs
+
+Only adjust UI layout and labels.
+
+Ensure no regression in existing functionality.

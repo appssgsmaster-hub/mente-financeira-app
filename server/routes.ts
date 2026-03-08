@@ -5,7 +5,9 @@ import { api } from "@shared/routes";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { sendPasswordResetEmail } from "./email";
 
 declare module "express-session" {
   interface SessionData {
@@ -113,6 +115,67 @@ export async function registerRoutes(
     });
   });
 
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email é obrigatório" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.json({ ok: true });
+      }
+
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiry = new Date(Date.now() + 60 * 60 * 1000);
+
+      await storage.updateUser(user.id, {
+        resetToken: token,
+        resetTokenExpiry: expiry,
+      });
+
+      const domains = process.env.REPLIT_DOMAINS;
+      const baseUrl = domains
+        ? `https://${domains.split(",")[0]}`
+        : `${req.protocol}://${req.get("host")}`;
+      const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+      await sendPasswordResetEmail(user.email, user.name, resetUrl);
+
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Forgot password error:", err);
+      res.status(500).json({ message: "Erro ao processar solicitação" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      if (!token || !password || password.length < 6) {
+        return res.status(400).json({ message: "Token e senha (mín. 6 caracteres) são obrigatórios" });
+      }
+
+      const user = await storage.getUserByResetToken(token);
+      if (!user || !user.resetTokenExpiry || new Date(user.resetTokenExpiry) < new Date()) {
+        return res.status(400).json({ message: "Link expirado ou inválido. Solicite um novo." });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 12);
+      await storage.updateUser(user.id, {
+        passwordHash,
+        resetToken: null,
+        resetTokenExpiry: null,
+      });
+
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Reset password error:", err);
+      res.status(500).json({ message: "Erro ao redefinir senha" });
+    }
+  });
+
   app.get("/api/auth/me", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Não autenticado" });
@@ -125,6 +188,53 @@ export async function registerRoutes(
     if (user.subscriptionStatus === "trial" && user.trialEndDate && new Date(user.trialEndDate) <= new Date()) {
       await storage.updateUser(user.id, { subscriptionStatus: "trial_expired" });
       user.subscriptionStatus = "trial_expired";
+    }
+
+    if (user.stripeCustomerId && (user.planTier === "free" || user.subscriptionStatus === "trial" || user.subscriptionStatus === "trial_expired")) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const PRICE_TO_TIER: Record<string, string> = {
+          'price_1T7u82Fmxmf4g4Sf6Gib2xs3': 'app',
+          'price_1T7uAiFmxmf4g4Sf0I2xPZoM': 'method',
+          'price_1T7uCTFmxmf4g4Sfkh9uIlYm': 'mentoria',
+        };
+        const tierHierarchy: Record<string, number> = { free: 0, app: 1, method: 2, mentoria: 3 };
+
+        const sessions = await stripe.checkout.sessions.list({
+          customer: user.stripeCustomerId,
+          limit: 10,
+        });
+
+        let highestTier = user.planTier || 'free';
+        let highestLevel = tierHierarchy[highestTier] || 0;
+
+        for (const session of sessions.data) {
+          if (session.payment_status !== 'paid') continue;
+          const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 5 });
+          for (const item of lineItems.data) {
+            const priceId = item.price?.id;
+            if (priceId && PRICE_TO_TIER[priceId]) {
+              const itemTier = PRICE_TO_TIER[priceId];
+              const itemLevel = tierHierarchy[itemTier] || 0;
+              if (itemLevel > highestLevel) {
+                highestTier = itemTier;
+                highestLevel = itemLevel;
+              }
+            }
+          }
+        }
+
+        if (highestLevel > (tierHierarchy[user.planTier] || 0)) {
+          await storage.updateUser(user.id, {
+            subscriptionStatus: 'active',
+            planTier: highestTier,
+          });
+          user.planTier = highestTier;
+          user.subscriptionStatus = 'active';
+        }
+      } catch (syncErr) {
+        console.error("Auto-sync plan error:", syncErr);
+      }
     }
 
     const { passwordHash: _, ...safeUser } = user;

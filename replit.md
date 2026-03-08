@@ -17,7 +17,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - **Mentoria Transformação Financeira** (€697): Everything + 3-month mentorship, 3 live sessions, private community, lifetime access
 
 ## Key Features
-- Multi-user authentication (register/login with email+password, bcrypt 12 rounds)
+- Multi-user authentication (register/login with email+password, bcrypt 12 rounds, forgot/reset password via email)
 - GDPR compliance: consent checkbox on registration, Privacy Policy & Terms of Use pages
 - 15-day free trial for new users
 - Tiered one-time payment plans via Stripe (€47 / €197 / €697)
@@ -39,7 +39,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - Footer with Privacy Policy, Terms of Use, and GDPR Compliance links
 
 ## Database Schema
-- `users`: id (serial), name, email, passwordHash, currency, trialStartDate, trialEndDate, stripeCustomerId, stripeSubscriptionId, subscriptionStatus, **planTier** (free|app|method|mentoria), createdAt
+- `users`: id (serial), name, email, passwordHash, currency, trialStartDate, trialEndDate, stripeCustomerId, stripeSubscriptionId, subscriptionStatus, **planTier** (free|app|method|mentoria), resetToken, resetTokenExpiry, createdAt
 - `accounts`: id (serial), userId, name, percentage, balance (cents), color
 - `transactions`: id (serial), userId, accountId, description, amount (cents), type, date, isRecurring, category
 - `stripe.*`: Managed by stripe-replit-sync (products, prices, subscriptions, etc.)
@@ -56,6 +56,9 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - Plan tier hierarchy: free < app < method < mentoria
 - Purchase sync endpoint: POST /api/stripe/sync-purchase
 - Webhook auto-updates planTier on `checkout.session.completed` (via payment_intent metadata or line item price lookup)
+- Auto-sync: `/api/auth/me` checks Stripe for paid sessions if user still on free plan (fallback for missed webhooks)
+- Email: Resend (RESEND_API_KEY env var), from `onboarding@resend.dev` (temporary, needs custom domain later)
+- Password reset tokens expire after 1 hour
 
 ## File Structure
 - `shared/schema.ts` — Database schema, Zod schemas, types
@@ -69,7 +72,9 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - `client/src/App.tsx` — Main app with auth-protected routing
 - `client/src/hooks/use-auth.tsx` — Auth context provider
 - `client/src/hooks/use-finance.ts` — Financial data hooks
-- `client/src/pages/AuthPage.tsx` — Login/Register page
+- `client/src/pages/AuthPage.tsx` — Login/Register/Forgot Password page
+- `client/src/pages/ResetPassword.tsx` — Password reset page (public)
+- `server/email.ts` — Email service (Resend)
 - `client/src/pages/Dashboard.tsx` — Main dashboard with upgrade prompts
 - `client/src/pages/DebtStrategy.tsx` — Debt management module (/dividas)
 - `client/src/pages/Plans.tsx` — Pricing page with 4 plan cards (trial + 3 paid)

@@ -16,6 +16,7 @@ import Education from "./pages/Education";
 import Plans from "./pages/Plans";
 import MentoriaWelcome from "./pages/MentoriaWelcome";
 import DebtStrategy from "./pages/DebtStrategy";
+import ResetPassword from "./pages/ResetPassword";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUse from "./pages/TermsOfUse";
 import { Loader2 } from "lucide-react";
@@ -25,6 +26,7 @@ function PublicRoutes() {
     <Switch>
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/terms-of-use" component={TermsOfUse} />
+      <Route path="/reset-password" component={ResetPassword} />
     </Switch>
   );
 }
@@ -33,7 +35,7 @@ function AppRoutes() {
   const { user, isLoading } = useAuth();
 
   const path = window.location.pathname;
-  if (path === "/privacy-policy" || path === "/terms-of-use") {
+  if (path === "/privacy-policy" || path === "/terms-of-use" || path === "/reset-password") {
     return <PublicRoutes />;
   }
 

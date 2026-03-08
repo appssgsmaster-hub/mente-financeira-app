@@ -6,8 +6,11 @@ import {
   CreditCard, 
   BookOpen, 
   Sparkles,
-  Shield
+  Shield,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +34,7 @@ const NAV_ITEMS: { title: string; href: string; icon: typeof LayoutDashboard; hi
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { logout } = useAuth();
 
   return (
     <Sidebar variant="inset" className="border-r border-border/50 bg-sidebar/50 backdrop-blur-xl">
@@ -76,7 +80,16 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-6">
+      <SidebarFooter className="p-6 space-y-4">
+        <Button
+          variant="outline"
+          className="w-full rounded-xl gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => logout()}
+          data-testid="button-logout-sidebar"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="font-medium text-sm">Sair</span>
+        </Button>
         <div className="relative overflow-hidden rounded-2xl p-4 text-center border border-primary/20 dark:border-primary/30 bg-gradient-to-br from-primary/5 via-blue-50/50 to-primary/10 dark:from-primary/10 dark:via-blue-950/20 dark:to-primary/5 shadow-sm">
           <div className="absolute top-1 right-2 text-primary/30 dark:text-primary/25 animate-pulse">
             <Sparkles className="w-4 h-4" />

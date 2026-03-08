@@ -84,10 +84,10 @@ export function MainLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full bg-background overflow-hidden">
+      <div className="flex h-[100dvh] w-full bg-background overflow-hidden">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="min-h-[3.5rem] sm:h-20 flex items-center justify-between px-3 sm:px-6 lg:px-10 border-b border-border/40 bg-background/80 backdrop-blur-md z-10 py-2 sm:py-0">
+          <header className="min-h-[3.5rem] sm:h-20 flex items-center justify-between px-3 sm:px-6 lg:px-10 border-b border-border/40 bg-background/80 backdrop-blur-md z-10 py-2 sm:py-0 shrink-0">
             <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
               <SidebarTrigger className="lg:hidden text-muted-foreground hover:text-foreground shrink-0" />
               <div className="min-w-0">
@@ -113,6 +113,15 @@ export function MainLayout({ children }: { children: ReactNode }) {
             </div>
             
             <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full text-destructive hover:bg-destructive/10 h-8 w-8 sm:hidden"
+                onClick={() => logout()}
+                data-testid="button-logout-mobile"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="rounded-full gap-2 hidden sm:flex border-border/50 hover:bg-accent" data-testid="button-user-menu">

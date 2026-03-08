@@ -287,7 +287,7 @@ export default function Dashboard() {
         {/* RIGHT COLUMN: Donut + Accounts Receivable stacked */}
         <div className="flex flex-col gap-6">
           {/* DONUT (Distribuição Ideal) */}
-          <Card className="p-6 rounded-3xl border-0 shadow-xl shadow-black/5 bg-white dark:bg-card flex flex-col justify-center items-center flex-1">
+          <Card className="p-6 rounded-3xl border-0 shadow-xl shadow-black/5 bg-white dark:bg-card flex flex-col justify-center items-center">
             <h3 className="font-display font-semibold text-lg text-center mb-2">
               Distribuição Ideal
             </h3>

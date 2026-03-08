@@ -19,6 +19,7 @@ import {
   Brain,
   ArrowRight,
   CreditCard,
+  ChevronDown,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -58,6 +59,9 @@ export default function Dashboard() {
     transactions
       ?.filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0) || 0;
+
+  const [commitmentsOpen, setCommitmentsOpen] = useState(false);
+  const [debtsOpen, setDebtsOpen] = useState(false);
 
   const [commitments, setCommitments] = useState<any[]>([]);
   useEffect(() => {
@@ -281,26 +285,9 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {planTier === "free" || planTier === "app" ? (
+      {/* MENTORSHIP CARDS - always 2 side by side */}
+      {(planTier === "free" || planTier === "app") && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {planTier === "free" && (
-            <Card
-              className="p-4 sm:p-5 rounded-2xl border-secondary/30 bg-gradient-to-r from-secondary/5 to-secondary/10 cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => navigate("/planos")}
-              data-testid="card-upgrade-method"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-5 h-5 text-secondary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-bold text-sm text-foreground">Método Mente Financeira</h4>
-                  <p className="text-xs text-muted-foreground mt-0.5">Treinamento completo + app por €197</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
-              </div>
-            </Card>
-          )}
           <Card
             className="p-4 sm:p-5 rounded-2xl border-amber-400/30 bg-gradient-to-r from-amber-50/50 to-amber-100/30 dark:from-amber-950/10 dark:to-amber-900/5 cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => navigate("/planos")}
@@ -317,30 +304,24 @@ export default function Dashboard() {
               <ArrowRight className="w-4 h-4 text-amber-500 shrink-0" />
             </div>
           </Card>
+          <Card
+            className="p-4 sm:p-5 rounded-2xl border-secondary/30 bg-gradient-to-r from-secondary/5 to-secondary/10 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate("/planos")}
+            data-testid="card-upgrade-method"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-secondary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-sm text-foreground">Método Mente Financeira</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">Treinamento completo + app</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
+            </div>
+          </Card>
         </div>
-      ) : null}
-
-      {/* DÍVIDAS - RESUMO */}
-      <Card
-        className="p-4 sm:p-5 rounded-2xl border-border cursor-pointer transition-shadow"
-        onClick={() => navigate("/dividas")}
-        data-testid="card-open-debts"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
-            <CreditCard className="w-5 h-5 text-destructive" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="font-bold text-sm text-foreground" data-testid="text-debts-title">Dívidas Abertas</h4>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {activeDebts.length > 0
-                ? `${activeDebts.length} ${activeDebts.length === 1 ? "dívida ativa" : "dívidas ativas"} · ${formatValue(totalDebt)}`
-                : "Nenhuma dívida registrada"}
-            </p>
-          </div>
-          <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
-        </div>
-      </Card>
+      )}
 
       {/* SUAS CONTAS */}
       <div>
@@ -404,6 +385,126 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* COLLAPSIBLE: PRÓXIMOS COMPROMISSOS */}
+      <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-commitments-collapsible">
+        <button
+          className="w-full p-4 sm:p-5 flex items-center justify-between text-left"
+          onClick={() => setCommitmentsOpen(!commitmentsOpen)}
+          data-testid="button-toggle-commitments"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm text-foreground">Próximos Compromissos</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {alerts.length > 0
+                  ? `${alerts.length} ${alerts.length === 1 ? "compromisso pendente" : "compromissos pendentes"}`
+                  : "resumo de compromissos futuros"}
+              </p>
+            </div>
+          </div>
+          <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${commitmentsOpen ? "rotate-180" : ""}`} />
+        </button>
+        {commitmentsOpen && (
+          <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3" data-testid="content-commitments-expanded">
+            {alerts.length > 0 ? (
+              <div className="space-y-2">
+                {alerts.map((alert, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/30 border border-border/50">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm text-foreground truncate">
+                        {alert.isIncome ? "📥 " : ""}{alert.description}
+                        {alert.recurrence === "SEMANAL" ? " (semanal)" : ""}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{alert.accountName}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-bold text-sm text-foreground">{formatValue(alert.value)}</p>
+                      <span className={`inline-block px-2 py-0.5 rounded-full font-bold text-[10px] mt-0.5 ${alert.isIncome ? 'bg-secondary/10 text-secondary' : alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
+                        {alert.isIncome ? 'A receber' : alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Nenhum compromisso pendente para este mês.</p>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full rounded-xl text-xs"
+              onClick={() => navigate("/projecoes")}
+              data-testid="button-go-to-projections"
+            >
+              Ver todas as projeções <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* COLLAPSIBLE: DÍVIDAS ABERTAS */}
+      <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-open-debts">
+        <button
+          className="w-full p-4 sm:p-5 flex items-center justify-between text-left"
+          onClick={() => setDebtsOpen(!debtsOpen)}
+          data-testid="button-toggle-debts"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+              <CreditCard className="w-5 h-5 text-destructive" />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm text-foreground" data-testid="text-debts-title">Dívidas Abertas</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {activeDebts.length > 0
+                  ? `${activeDebts.length} ${activeDebts.length === 1 ? "dívida ativa" : "dívidas ativas"} · ${formatValue(totalDebt)}`
+                  : "resumo das dívidas registradas"}
+              </p>
+            </div>
+          </div>
+          <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${debtsOpen ? "rotate-180" : ""}`} />
+        </button>
+        {debtsOpen && (
+          <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3" data-testid="content-debts-expanded">
+            {activeDebts.length > 0 ? (
+              <div className="space-y-2">
+                {activeDebts.map((d: any) => (
+                  <div key={d.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/30 border border-border/50">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm text-foreground truncate">{d.creditor}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {d.priority === "high" ? "Alta" : d.priority === "low" ? "Baixa" : "Média"} prioridade
+                      </p>
+                    </div>
+                    <p className="font-bold text-sm text-destructive shrink-0">{formatValue(d.amount)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
+                <CreditCard className="w-4 h-4 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Nenhuma dívida ativa registrada.</p>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full rounded-xl text-xs"
+              onClick={() => navigate("/dividas")}
+              data-testid="button-go-to-debts"
+            >
+              Gerenciar dívidas <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

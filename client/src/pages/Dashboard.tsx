@@ -73,9 +73,9 @@ export default function Dashboard() {
       ?.filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0) || 0;
 
-  const [commitmentsOpen, setCommitmentsOpen] = useState(false);
-  const [debtsOpen, setDebtsOpen] = useState(false);
-  const [receivablesOpen, setReceivablesOpen] = useState(false);
+  const [commitmentsOpen, setCommitmentsOpen] = useState(true);
+  const [debtsOpen, setDebtsOpen] = useState(true);
+  const [receivablesOpen, setReceivablesOpen] = useState(true);
 
   const [commitments, setCommitments] = useState<any[]>([]);
   useEffect(() => {

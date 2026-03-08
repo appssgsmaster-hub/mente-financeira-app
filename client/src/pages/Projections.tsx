@@ -150,7 +150,7 @@ export default function Projections() {
   const now = new Date();
   const [monthIndex, setMonthIndex] = useState<number>(now.getMonth());
   const [openAccountId, setOpenAccountId] = useState<number | null>(null);
-  const [openIncomeSection, setOpenIncomeSection] = useState(false);
+  const [openIncomeSection, setOpenIncomeSection] = useState(true);
   const [items, setItems] = useState<Commitment[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

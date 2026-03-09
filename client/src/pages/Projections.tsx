@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useAccounts, useUser } from "@/hooks/use-finance";
+import { useMemo, useState } from "react";
+import { useAccounts, useUser, useCommitments, useCreateCommitment, useUpdateCommitment, useDeleteCommitment } from "@/hooks/use-finance";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,27 +27,10 @@ import {
   ResponsiveContainer,
   Legend
 } from "recharts";
+import type { Commitment } from "@shared/schema";
 
 type Recurrence = "FIXO" | "SEMANAL" | "PARCELADO";
 type CommitmentType = "expense" | "income";
-
-type Commitment = {
-  id: string;
-  accountId: number;
-  description: string;
-  value: number;
-  startDate: string;
-  recurrence: Recurrence;
-  installments?: number;
-  category: string;
-  createdAt: string;
-  paidPeriods?: string[];
-  commitmentType?: CommitmentType;
-};
-
-function getLsKey(userId?: number) {
-  return userId ? `sgs_commitments_v1_user_${userId}` : "sgs_commitments_v1";
-}
 
 const EXPENSE_CATEGORIES = [
   "Estrutura Física",
@@ -77,9 +60,9 @@ function getPeriodKey(monthIndex: number, year?: number) {
   return `${y}-${String(monthIndex + 1).padStart(2, "0")}`;
 }
 
-function isCommitmentPaid(c: Commitment, monthIndex: number, year?: number) {
+function isCommitmentPaid(c: any, monthIndex: number, year?: number) {
   const period = getPeriodKey(monthIndex, year);
-  return (c.paidPeriods || []).includes(period);
+  return ((c.paidPeriods as string[]) || []).includes(period);
 }
 
 function weeklyOccurrencesInMonth(startDateStr: string, monthIndex: number, year: number) {
@@ -94,7 +77,7 @@ function weeklyOccurrencesInMonth(startDateStr: string, monthIndex: number, year
   return Math.ceil(daysInRange / 7);
 }
 
-function getMonthlyValue(c: Commitment, monthIndex: number, year: number) {
+function getMonthlyValue(c: any, monthIndex: number, year: number) {
   if (c.recurrence === "SEMANAL") {
     return c.value * weeklyOccurrencesInMonth(c.startDate, monthIndex, year);
   }
@@ -131,7 +114,7 @@ function moneyToCents(input: string) {
   return Math.round(num * 100);
 }
 
-function isActiveInMonth(c: Commitment, monthIndex: number, year: number) {
+function isActiveInMonth(c: any, monthIndex: number, year: number) {
   const d = new Date(c.startDate);
   const msEnd = new Date(year, monthIndex + 1, 0).getTime();
   const t = d.getTime();
@@ -147,13 +130,17 @@ function isActiveInMonth(c: Commitment, monthIndex: number, year: number) {
 export default function Projections() {
   const { data: accounts } = useAccounts();
   const { data: user } = useUser();
+  const { data: items = [], isLoading: isLoadingCommitments } = useCommitments();
+  const { mutate: createCommitment, isPending: isCreating } = useCreateCommitment();
+  const { mutate: updateCommitmentMut, isPending: isUpdating } = useUpdateCommitment();
+  const { mutate: deleteCommitmentMut } = useDeleteCommitment();
+
   const now = new Date();
   const [monthIndex, setMonthIndex] = useState<number>(now.getMonth());
   const [openAccountId, setOpenAccountId] = useState<number | null>(null);
   const [openIncomeSection, setOpenIncomeSection] = useState(true);
-  const [items, setItems] = useState<Commitment[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [accountId, setAccountId] = useState<number>(0);
   const [description, setDescription] = useState("");
@@ -163,32 +150,6 @@ export default function Projections() {
   const [installmentsStr, setInstallmentsStr] = useState<string>("1");
   const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
   const [commitmentType, setCommitmentType] = useState<CommitmentType>("expense");
-
-  const lsKey = getLsKey(user?.id);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    try {
-      const raw = localStorage.getItem(lsKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setItems(parsed);
-      } else {
-        setItems([]);
-      }
-    } catch {}
-  }, [user?.id, lsKey]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    localStorage.setItem(lsKey, JSON.stringify(items));
-  }, [items, lsKey, user?.id]);
-
-  useEffect(() => {
-    if (accounts?.length && !accountId) {
-      setAccountId(accounts[0].id);
-    }
-  }, [accounts]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -265,39 +226,41 @@ export default function Projections() {
 
   function openEdit(c: Commitment) {
     setEditingId(c.id);
-    setCommitmentType(c.commitmentType || "expense");
-    setAccountId(c.accountId);
+    setCommitmentType((c.commitmentType || "expense") as CommitmentType);
+    setAccountId(c.accountId ?? 0);
     setDescription(c.description);
     setValueStr(String((c.value / 100).toFixed(2)).replace(".", ","));
     setStartDate(c.startDate);
-    setRecurrence(c.recurrence);
+    setRecurrence(c.recurrence as Recurrence);
     setInstallmentsStr(String(c.installments ?? 1));
     setCategory(c.category);
     setIsModalOpen(true);
   }
 
-  function remove(id: string) {
-    setItems((prev) => prev.filter((x) => x.id !== id));
+  function remove(id: number) {
+    deleteCommitmentMut(id);
   }
 
   function save() {
     if (!description.trim()) return;
     if (commitmentType === "expense" && !accountId) return;
     const valueCents = moneyToCents(valueStr);
-    const payload: Commitment = {
-      id: editingId ?? makeId(),
+    const basePayload = {
+      userId: user?.id ?? 0,
       accountId: commitmentType === "income" ? (accountId || accounts?.[0]?.id || 0) : accountId,
       description: description.trim(),
       value: valueCents,
       startDate,
       recurrence,
-      installments: recurrence === "PARCELADO" ? Number(installmentsStr) : undefined,
+      installments: recurrence === "PARCELADO" ? Number(installmentsStr) : null,
       category,
-      createdAt: new Date().toISOString(),
       commitmentType,
     };
-    setItems((prev) => editingId ? prev.map((x) => (x.id === editingId ? payload : x)) : [payload, ...prev]);
-    setIsModalOpen(false);
+    if (editingId) {
+      updateCommitmentMut({ id: editingId, data: basePayload }, { onSuccess: () => setIsModalOpen(false) });
+    } else {
+      createCommitment({ ...basePayload, paidPeriods: [] as string[] }, { onSuccess: () => setIsModalOpen(false) });
+    }
   }
 
   const categories = commitmentType === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
@@ -320,16 +283,16 @@ export default function Projections() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="p-6 rounded-3xl border-border shadow-sm lg:col-span-2">
-          <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+        <Card className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl border-border shadow-sm lg:col-span-2">
+          <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" /> Curva de Crescimento Estimada
           </h3>
-          <div className="h-[300px] w-full">
+          <div className="h-[260px] sm:h-[300px] w-full -ml-2 sm:ml-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => formatCurrency(val * 100).split(',')[0]} width={80} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => formatCurrency(val * 100).split(',')[0]} width={60} tick={{ fontSize: 11 }} />
                 <RechartsTooltip 
                   formatter={(val: number, name: string) => {
                     const labels: Record<string, string> = { valor: "Patrimônio", saidas: "Saídas", entradas: "Entradas" };

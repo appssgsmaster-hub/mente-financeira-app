@@ -39,9 +39,14 @@ export function AppSidebar() {
   return (
     <Sidebar variant="inset" className="border-r border-border/50 bg-sidebar/50 backdrop-blur-xl">
       <SidebarContent className="pt-6">
-        <div className="px-6 mb-8">
-          <h2 className="text-xl font-bold font-display tracking-tight text-primary leading-tight">Mente Financeira</h2>
-          <p className="text-[10px] text-muted-foreground mt-0.5 tracking-wider uppercase font-medium">Prosperar é Viver</p>
+        <div className="px-6 mb-8 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-md shadow-primary/20 shrink-0">
+            <span className="text-white font-bold text-sm tracking-tight">MF</span>
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold font-display tracking-tight text-primary leading-tight">Mente Financeira</h2>
+            <p className="text-[10px] text-muted-foreground mt-0.5 tracking-wider uppercase font-medium">Prosperar é Viver</p>
+          </div>
         </div>
         
         <SidebarGroup>

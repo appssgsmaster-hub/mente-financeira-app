@@ -2,7 +2,7 @@ import { ReactNode, useMemo, useState, useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/hooks/use-auth";
-import { useAccounts, useTransactions } from "@/hooks/use-finance";
+import { useAccounts, useTransactions, useCommitments } from "@/hooks/use-finance";
 import { getMentorMessage } from "@/lib/mentor-messages";
 import { User as UserIcon, LogOut, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
   const { user, isLoading, logout } = useAuth();
   const { data: accounts } = useAccounts();
   const { data: transactions } = useTransactions();
+  const { data: commitments = [] } = useCommitments();
 
   const style = {
     "--sidebar-width": "18rem",
@@ -54,18 +55,10 @@ export function MainLayout({ children }: { children: ReactNode }) {
       .reduce((s, t) => s + t.amount, 0) || 0;
 
     let commitmentAlerts = 0;
-    try {
-      if (user?.id) {
-        const raw = localStorage.getItem(`sgs_commitments_v1_user_${user.id}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const nextWeek = new Date();
-          nextWeek.setDate(now.getDate() + 7);
-          const nextWeekStr = nextWeek.toISOString().split('T')[0];
-          commitmentAlerts = parsed.filter((c: any) => c.startDate <= nextWeekStr).length;
-        }
-      }
-    } catch {}
+    const nextWeek = new Date();
+    nextWeek.setDate(now.getDate() + 7);
+    const nextWeekStr = nextWeek.toISOString().split('T')[0];
+    commitmentAlerts = commitments.filter((c) => c.startDate <= nextWeekStr).length;
 
     return getMentorMessage({
       totalBalance,
@@ -80,7 +73,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
       dayOfWeek: now.getDay(),
       hour: now.getHours(),
     });
-  }, [accounts, transactions, user?.id, user?.name]);
+  }, [accounts, transactions, commitments, user?.id, user?.name]);
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>

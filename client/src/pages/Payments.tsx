@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowUpRight, ArrowDownRight, Receipt, Pencil, Trash2, PlusCircle, Globe, Link2, ChevronDown } from "lucide-react";
@@ -14,7 +14,10 @@ import {
   useDistributeIncome,
   useCreateTransaction,
   useUser,
+  useCommitments,
+  useUpdateCommitment,
 } from "@/hooks/use-finance";
+import type { Commitment } from "@shared/schema";
 
 function parseMoneyInput(raw: string) {
   let v = raw.replace(/[^\d.,-]/g, "");
@@ -34,24 +37,6 @@ function formatCurrency(value: number, currency = "BRL") {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value / 100);
-}
-
-type Commitment = {
-  id: string;
-  accountId: number;
-  description: string;
-  value: number;
-  startDate: string;
-  recurrence: "FIXO" | "SEMANAL" | "PARCELADO";
-  installments?: number;
-  category: string;
-  createdAt: string;
-  paidPeriods?: string[];
-  commitmentType?: "expense" | "income";
-};
-
-function getLsKey(userId?: number) {
-  return userId ? `sgs_commitments_v1_user_${userId}` : "sgs_commitments_v1";
 }
 
 function getPeriodFromDate(dateStr: string) {
@@ -96,27 +81,8 @@ export default function Payments() {
   const [editDescription, setEditDescription] = useState("");
   const [editAmountRaw, setEditAmountRaw] = useState("");
 
-  const [commitments, setCommitments] = useState<Commitment[]>([]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const key = getLsKey(user.id);
-    function loadCommitments() {
-      try {
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) setCommitments(parsed);
-        }
-      } catch {}
-    }
-    loadCommitments();
-    function onStorage(e: StorageEvent) {
-      if (e.key === key) loadCommitments();
-    }
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [user?.id]);
+  const { data: commitments = [] } = useCommitments();
+  const { mutate: updateCommitmentMut } = useUpdateCommitment();
 
   const openCommitments = useMemo(() => {
     const now = new Date();
@@ -138,7 +104,7 @@ export default function Payments() {
         active = diff >= 0 && diff < n && t <= msEnd;
       }
       if (!active) return false;
-      const paid = c.paidPeriods || [];
+      const paid = (c.paidPeriods as string[]) || [];
       return !paid.includes(currentPeriod);
     });
   }, [commitments]);
@@ -163,7 +129,7 @@ export default function Payments() {
         active = diff >= 0 && diff < n && t <= msEnd;
       }
       if (!active) return false;
-      const paid = c.paidPeriods || [];
+      const paid = (c.paidPeriods as string[]) || [];
       return !paid.includes(currentPeriod);
     });
   }, [commitments]);
@@ -171,7 +137,7 @@ export default function Payments() {
   function handleLinkChange(commitmentId: string) {
     setLinkedCommitment(commitmentId);
     if (commitmentId) {
-      const c = commitments.find((x) => x.id === commitmentId);
+      const c = commitments.find((x) => String(x.id) === commitmentId);
       if (c) {
         setDesc(c.description);
         setAmount(String((c.value / 100).toFixed(2)).replace(".", ","));
@@ -186,21 +152,19 @@ export default function Payments() {
 
   function getLinkedCommitmentType(): "expense" | "income" | null {
     if (!linkedCommitment) return null;
-    const c = commitments.find((x) => x.id === linkedCommitment);
-    return c ? (c.commitmentType || "expense") : null;
+    const c = commitments.find((x) => String(x.id) === linkedCommitment);
+    return c ? ((c.commitmentType || "expense") as "expense" | "income") : null;
   }
 
   function markCommitmentPaid(commitmentId: string, dateStr: string) {
     if (!user?.id) return;
+    const numId = parseInt(commitmentId);
+    const c = commitments.find((x) => x.id === numId);
+    if (!c) return;
     const period = getPeriodFromDate(dateStr);
-    const updated = commitments.map((c) => {
-      if (c.id !== commitmentId) return c;
-      const paid = c.paidPeriods || [];
-      if (paid.includes(period)) return c;
-      return { ...c, paidPeriods: [...paid, period] };
-    });
-    setCommitments(updated);
-    localStorage.setItem(getLsKey(user.id), JSON.stringify(updated));
+    const paid = (c.paidPeriods as string[]) || [];
+    if (paid.includes(period)) return;
+    updateCommitmentMut({ id: numId, data: { paidPeriods: [...paid, period] } });
   }
 
   function handleAddIncome() {

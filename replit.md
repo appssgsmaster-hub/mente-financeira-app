@@ -26,7 +26,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - 6 accounts financial method with configurable percentages
 - Income distribution across accounts by percentage
 - Transaction tracking (income/expense) with custom date picker
-- Projection system with commitments (localStorage-based): monthly, weekly (SEMANAL), and installment (PARCELADO) recurrences
+- Projection system with commitments (database-backed): monthly, weekly (SEMANAL), and installment (PARCELADO) recurrences
 - Income receivables: projected future income with "A Receber" feature
 - Commitment linking: expenses and income can be linked to open commitments, marking them as paid/received
 - Redistribute balances: toggle in Settings to redistribute ecosystem balance when changing percentages
@@ -36,18 +36,22 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - AI Mentor: dynamic motivational messages based on financial context
 - PWA (Progressive Web App): installable on mobile/desktop, offline-capable
 - Fully mobile-responsive layout across all pages
+- Download Report: CSV export from Dashboard with accounts, transactions, commitments, debts
+- Brand: MF monogram SVG icon, OG meta tags, sidebar logo
 - Footer with Privacy Policy, Terms of Use, and GDPR Compliance links
 
 ## Database Schema
 - `users`: id (serial), name, email, passwordHash, currency, trialStartDate, trialEndDate, stripeCustomerId, stripeSubscriptionId, subscriptionStatus, **planTier** (free|app|method|mentoria), resetToken, resetTokenExpiry, createdAt
 - `accounts`: id (serial), userId, name, percentage, balance (cents), color
 - `transactions`: id (serial), userId, accountId, description, amount (cents), type, date, isRecurring, category
+- `commitments`: id (serial), userId, accountId, description, value (cents), startDate, recurrence (FIXO|SEMANAL|PARCELADO), installments (nullable), category, commitmentType (expense|income), paidPeriods (text[]), createdAt
+- `debts`: id (serial), userId, creditor, amount (cents), registeredDate, priority (alta|media|baixa), paid (boolean), createdAt
 - `stripe.*`: Managed by stripe-replit-sync (products, prices, subscriptions, etc.)
 
 ## Important Notes
 - Amounts stored in **cents** — divide by 100 for display, multiply by 100 on input
-- Commitments (projections) stored in `localStorage` key `sgs_commitments_v1_user_${userId}`
-- Debts stored in `localStorage` key `sgs_debts_v1_user_${userId}` with `{ id, creditor, amount, registeredDate, priority, paid }`
+- Commitments and debts are stored in the database (NOT localStorage) — syncs across devices
+- React Query hooks: useCommitments, useCreateCommitment, useUpdateCommitment, useDeleteCommitment, useDebts, useCreateDebt, useUpdateDebt, useDeleteDebt
 - Session secret from `SESSION_SECRET` env var
 - Stripe connector: `connection:conn_stripe_01KJYXD88BBD71F7JEDMHSGHJ1`
 - Stripe products: "Mente Financeira App" (€47), "Método Mente Financeira" (€197), "Mentoria Transformação Financeira" (€697)

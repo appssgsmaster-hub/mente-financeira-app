@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import type { User, Account, Transaction } from "@shared/schema";
+import type { User, Account, Transaction, Commitment, Debt } from "@shared/schema";
 
 // Custom fetching wrapper to parse and handle Zod schemas explicitly
 async function fetchWithZod<T>(
@@ -172,6 +172,120 @@ export function useDeleteTransaction() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.transactions.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
+    },
+  });
+}
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: "include" });
+  if (!res.ok) {
+    if (res.status === 401) {
+      window.location.href = "/";
+      throw new Error("Sessão expirada");
+    }
+    if (res.status === 403) {
+      window.location.href = "/planos";
+      throw new Error("Acesso restrito");
+    }
+    let msg = "Erro";
+    try { const d = await res.json(); if (d.message) msg = d.message; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+export function useCommitments() {
+  return useQuery<Commitment[]>({
+    queryKey: ["/api/commitments"],
+    queryFn: () => apiFetch<Commitment[]>("/api/commitments"),
+  });
+}
+
+export function useCreateCommitment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<Commitment, "id" | "createdAt">) =>
+      apiFetch<Commitment>("/api/commitments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commitments"] });
+    },
+  });
+}
+
+export function useUpdateCommitment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<Commitment> }) =>
+      apiFetch<Commitment>(`/api/commitments/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commitments"] });
+    },
+  });
+}
+
+export function useDeleteCommitment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<{ ok: true }>(`/api/commitments/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commitments"] });
+    },
+  });
+}
+
+export function useDebts() {
+  return useQuery<Debt[]>({
+    queryKey: ["/api/debts"],
+    queryFn: () => apiFetch<Debt[]>("/api/debts"),
+  });
+}
+
+export function useCreateDebt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<Debt, "id" | "createdAt">) =>
+      apiFetch<Debt>("/api/debts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
+    },
+  });
+}
+
+export function useUpdateDebt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<Debt> }) =>
+      apiFetch<Debt>(`/api/debts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
+    },
+  });
+}
+
+export function useDeleteDebt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<{ ok: true }>(`/api/debts/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
     },
   });
 }

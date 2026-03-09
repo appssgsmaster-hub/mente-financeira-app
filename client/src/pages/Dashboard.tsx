@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useAccounts, useTransactions, useUser } from "@/hooks/use-finance";
+import { useMemo, useState } from "react";
+import { useAccounts, useTransactions, useUser, useCommitments, useDebts } from "@/hooks/use-finance";
 import { formatCurrency } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +16,7 @@ import {
   ArrowRight,
   CreditCard,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -77,34 +78,9 @@ export default function Dashboard() {
   const [debtsOpen, setDebtsOpen] = useState(true);
   const [receivablesOpen, setReceivablesOpen] = useState(true);
 
-  const [commitments, setCommitments] = useState<any[]>([]);
-  useEffect(() => {
-    if (!user?.id) return;
-    try {
-      const lsKey = `sgs_commitments_v1_user_${user.id}`;
-      const raw = localStorage.getItem(lsKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setCommitments(parsed);
-      } else {
-        setCommitments([]);
-      }
-    } catch {}
-  }, [user?.id]);
-
-  const debtsLsKey = user?.id ? `sgs_debts_v1_user_${user.id}` : "";
-  const [debts, setDebts] = useState<any[]>([]);
-  useEffect(() => {
-    if (!debtsLsKey) return;
-    try {
-      const raw = localStorage.getItem(debtsLsKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setDebts(parsed);
-      }
-    } catch {}
-  }, [debtsLsKey]);
-  const activeDebts = debts.filter((d) => !d.paid);
+  const { data: commitments = [] } = useCommitments();
+  const { data: debtsData = [] } = useDebts();
+  const activeDebts = debtsData.filter((d) => !d.paid);
   const totalDebt = activeDebts.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
   const now = new Date();
@@ -179,6 +155,51 @@ export default function Dashboard() {
     }).format(value / 100);
   };
 
+  function downloadReport() {
+    const curr = user?.currency || "BRL";
+    const fmtVal = (v: number) => (v / 100).toFixed(2);
+    const lines: string[] = [];
+    lines.push("Mente Financeira - Relatório Financeiro");
+    lines.push(`Data: ${new Date().toLocaleDateString("pt-BR")}`);
+    lines.push(`Usuário: ${user?.name || ""}`);
+    lines.push("");
+    lines.push("=== CONTAS ===");
+    lines.push("Conta,Porcentagem,Saldo");
+    (accounts || []).forEach(a => {
+      lines.push(`${a.name},${a.percentage}%,${fmtVal(a.balance)}`);
+    });
+    lines.push(`Total,,${fmtVal(totalBalance)}`);
+    lines.push("");
+    lines.push("=== TRANSAÇÕES ===");
+    lines.push("Data,Descrição,Tipo,Valor,Conta");
+    (transactions || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(t => {
+      const accName = accounts?.find(a => a.id === t.accountId)?.name || "Ecossistema";
+      lines.push(`${new Date(t.date).toLocaleDateString("pt-BR")},${t.description},${t.type === "income" ? "Entrada" : "Saída"},${fmtVal(t.amount)},${accName}`);
+    });
+    lines.push("");
+    lines.push("=== COMPROMISSOS ===");
+    lines.push("Descrição,Tipo,Valor,Recorrência,Categoria");
+    commitments.forEach(c => {
+      lines.push(`${c.description},${c.commitmentType === "income" ? "Receita" : "Despesa"},${fmtVal(c.value)},${c.recurrence},${c.category}`);
+    });
+    lines.push("");
+    lines.push("=== DÍVIDAS ===");
+    lines.push("Credor,Valor,Prioridade,Status");
+    debtsData.forEach(d => {
+      lines.push(`${d.creditor},${fmtVal(d.amount)},${d.priority},${d.paid ? "Quitada" : "Ativa"}`);
+    });
+
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mente-financeira-report-${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   if (loadingAccounts || loadingTransactions) {
     return (
       <div className="space-y-8 animate-pulse">
@@ -194,6 +215,13 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 pb-12">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl sm:text-2xl font-display font-bold text-foreground">Painel Financeiro</h1>
+        <Button variant="outline" size="sm" onClick={downloadReport} className="gap-2" data-testid="button-download-report">
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:inline">Baixar Relatório</span>
+        </Button>
+      </div>
       {/* 1 — ECOSSISTEMA TOTAL + DONUT ROW */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-5 sm:p-8 rounded-2xl sm:rounded-3xl shadow-xl border border-primary/10 bg-gradient-to-br from-primary/[0.03] via-white to-secondary/[0.04] dark:from-primary/[0.06] dark:via-card dark:to-secondary/[0.06] overflow-hidden relative">

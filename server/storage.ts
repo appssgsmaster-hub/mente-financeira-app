@@ -1,9 +1,11 @@
 import { db } from "./db";
 import {
-  users, accounts, transactions,
+  users, accounts, transactions, commitments, debts,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Transaction, type InsertTransaction,
+  type Commitment, type InsertCommitment,
+  type Debt, type InsertDebt,
   type UpdateAccountPercentagesRequest,
   type DistributeIncomeRequest
 } from "@shared/schema";
@@ -28,6 +30,14 @@ export interface IStorage {
   deleteAccount(id: number): Promise<void>;
   resetAllData(userId: number): Promise<void>;
   seedDefaultAccounts(userId: number): Promise<void>;
+  getCommitments(userId: number): Promise<Commitment[]>;
+  createCommitment(data: InsertCommitment): Promise<Commitment>;
+  updateCommitment(userId: number, id: number, data: Partial<Commitment>): Promise<Commitment>;
+  deleteCommitment(userId: number, id: number): Promise<void>;
+  getDebts(userId: number): Promise<Debt[]>;
+  createDebt(data: InsertDebt): Promise<Debt>;
+  updateDebt(userId: number, id: number, data: Partial<Debt>): Promise<Debt>;
+  deleteDebt(userId: number, id: number): Promise<void>;
   getStripeProduct(productId: string): Promise<any>;
   getStripeSubscription(subscriptionId: string): Promise<any>;
   listStripeProductsWithPrices(): Promise<any[]>;
@@ -291,6 +301,60 @@ export class DatabaseStorage implements IStorage {
     await db.update(accounts)
       .set({ balance: 0 })
       .where(eq(accounts.userId, userId));
+  }
+
+  async getCommitments(userId: number): Promise<Commitment[]> {
+    return await db.select().from(commitments)
+      .where(eq(commitments.userId, userId))
+      .orderBy(desc(commitments.createdAt));
+  }
+
+  async createCommitment(data: InsertCommitment): Promise<Commitment> {
+    const [c] = await db.insert(commitments).values(data).returning();
+    return c;
+  }
+
+  async updateCommitment(userId: number, id: number, data: Partial<Commitment>): Promise<Commitment> {
+    const [existing] = await db.select().from(commitments).where(eq(commitments.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Compromisso não encontrado");
+    const [updated] = await db.update(commitments)
+      .set(data)
+      .where(eq(commitments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCommitment(userId: number, id: number): Promise<void> {
+    const [existing] = await db.select().from(commitments).where(eq(commitments.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Compromisso não encontrado");
+    await db.delete(commitments).where(eq(commitments.id, id));
+  }
+
+  async getDebts(userId: number): Promise<Debt[]> {
+    return await db.select().from(debts)
+      .where(eq(debts.userId, userId))
+      .orderBy(desc(debts.createdAt));
+  }
+
+  async createDebt(data: InsertDebt): Promise<Debt> {
+    const [d] = await db.insert(debts).values(data).returning();
+    return d;
+  }
+
+  async updateDebt(userId: number, id: number, data: Partial<Debt>): Promise<Debt> {
+    const [existing] = await db.select().from(debts).where(eq(debts.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Dívida não encontrada");
+    const [updated] = await db.update(debts)
+      .set(data)
+      .where(eq(debts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDebt(userId: number, id: number): Promise<void> {
+    const [existing] = await db.select().from(debts).where(eq(debts.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Dívida não encontrada");
+    await db.delete(debts).where(eq(debts.id, id));
   }
 
   async getStripeProduct(productId: string): Promise<any> {

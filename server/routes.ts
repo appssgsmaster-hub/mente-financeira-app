@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { registerSchema, loginSchema } from "@shared/schema";
+import { registerSchema, loginSchema, insertCommitmentSchema, insertDebtSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -362,6 +362,82 @@ export async function registerRoutes(
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ message: "Erro ao resetar dados" });
+    }
+  });
+
+  app.get("/api/commitments", requireActiveSubscription, async (req, res) => {
+    const items = await storage.getCommitments(req.session.userId!);
+    res.json(items);
+  });
+
+  app.post("/api/commitments", requireActiveSubscription, async (req, res) => {
+    try {
+      const parsed = insertCommitmentSchema.parse({ ...req.body, userId: req.session.userId! });
+      const c = await storage.createCommitment(parsed);
+      res.status(201).json(c);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Dados inválidos", errors: err.errors });
+      }
+      res.status(400).json({ message: (err as Error).message });
+    }
+  });
+
+  app.patch("/api/commitments/:id", requireActiveSubscription, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateCommitment(req.session.userId!, id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(404).json({ message: (err as Error).message });
+    }
+  });
+
+  app.delete("/api/commitments/:id", requireActiveSubscription, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteCommitment(req.session.userId!, id);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(404).json({ message: (err as Error).message });
+    }
+  });
+
+  app.get("/api/debts", requireActiveSubscription, async (req, res) => {
+    const items = await storage.getDebts(req.session.userId!);
+    res.json(items);
+  });
+
+  app.post("/api/debts", requireActiveSubscription, async (req, res) => {
+    try {
+      const parsed = insertDebtSchema.parse({ ...req.body, userId: req.session.userId! });
+      const d = await storage.createDebt(parsed);
+      res.status(201).json(d);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Dados inválidos", errors: err.errors });
+      }
+      res.status(400).json({ message: (err as Error).message });
+    }
+  });
+
+  app.patch("/api/debts/:id", requireActiveSubscription, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateDebt(req.session.userId!, id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(404).json({ message: (err as Error).message });
+    }
+  });
+
+  app.delete("/api/debts/:id", requireActiveSubscription, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteDebt(req.session.userId!, id);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(404).json({ message: (err as Error).message });
     }
   });
 

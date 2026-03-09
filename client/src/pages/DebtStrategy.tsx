@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useUser, useAccounts } from "@/hooks/use-finance";
+import { useUser, useAccounts, useDebts, useCreateDebt, useUpdateDebt, useDeleteDebt, useCreateCommitment } from "@/hooks/use-finance";
 import { formatCurrency } from "@/lib/format";
 import {
   CreditCard,
@@ -25,15 +25,6 @@ import { useLocation } from "wouter";
 
 type DebtPriority = "high" | "medium" | "low";
 
-interface Debt {
-  id: string;
-  creditor: string;
-  amount: number;
-  registeredDate: string;
-  priority: DebtPriority;
-  paid?: boolean;
-}
-
 const priorityOrder: Record<DebtPriority, number> = { high: 0, medium: 1, low: 2 };
 const priorityLabel: Record<DebtPriority, string> = { high: "Alta", medium: "Média", low: "Baixa" };
 const priorityColor: Record<DebtPriority, string> = {
@@ -42,58 +33,30 @@ const priorityColor: Record<DebtPriority, string> = {
   low: "bg-muted text-muted-foreground",
 };
 
-function getLsKey(userId?: number) {
-  return userId ? `sgs_debts_v1_user_${userId}` : "";
-}
-
-function getCommitmentsLsKey(userId?: number) {
-  return userId ? `sgs_commitments_v1_user_${userId}` : "sgs_commitments_v1";
-}
-
 export default function DebtStrategy() {
   const { data: user } = useUser();
   const { data: accounts } = useAccounts();
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
-  const [debts, setDebts] = useState<Debt[]>([]);
+  const { data: debts = [] } = useDebts();
+  const { mutate: createDebt } = useCreateDebt();
+  const { mutate: updateDebtMut } = useUpdateDebt();
+  const { mutate: deleteDebtMut } = useDeleteDebt();
+  const { mutate: createCommitment } = useCreateCommitment();
+
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [creditor, setCreditor] = useState("");
   const [amount, setAmount] = useState("");
   const [priority, setPriority] = useState<DebtPriority>("medium");
 
-  const [simDebtId, setSimDebtId] = useState<string | null>(null);
+  const [simDebtId, setSimDebtId] = useState<number | null>(null);
   const [simPayment, setSimPayment] = useState("");
   const [showSimModal, setShowSimModal] = useState(false);
   const [simPriorityFilter, setSimPriorityFilter] = useState<DebtPriority | "all">("all");
 
   const [showAiPopup, setShowAiPopup] = useState(false);
-
-  const lsKey = getLsKey(user?.id);
-
-  useEffect(() => {
-    if (!lsKey) return;
-    try {
-      const raw = localStorage.getItem(lsKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setDebts(parsed.map((d: any) => ({
-            ...d,
-            priority: d.priority || "medium",
-            registeredDate: d.registeredDate || d.dueDate || new Date().toISOString().split("T")[0],
-            paid: d.paid || false,
-          })));
-        }
-      }
-    } catch {}
-  }, [lsKey]);
-
-  function save(updated: Debt[]) {
-    setDebts(updated);
-    if (lsKey) localStorage.setItem(lsKey, JSON.stringify(updated));
-  }
 
   function handleSave() {
     const val = parseFloat(amount.replace(/\./g, "").replace(",", "."));
@@ -102,19 +65,20 @@ export default function DebtStrategy() {
       return;
     }
     if (editingId) {
-      save(debts.map((d) => d.id === editingId ? { ...d, creditor, amount: Math.round(val * 100), priority } : d));
-      toast({ title: "Dívida atualizada" });
+      updateDebtMut({ id: editingId, data: { creditor, amount: Math.round(val * 100), priority } }, {
+        onSuccess: () => toast({ title: "Dívida atualizada" }),
+      });
     } else {
-      const newDebt: Debt = {
-        id: crypto.randomUUID(),
+      createDebt({
+        userId: user?.id ?? 0,
         creditor,
         amount: Math.round(val * 100),
         registeredDate: new Date().toISOString().split("T")[0],
         priority,
         paid: false,
-      };
-      save([...debts, newDebt]);
-      toast({ title: "Dívida registrada" });
+      }, {
+        onSuccess: () => toast({ title: "Dívida registrada" }),
+      });
     }
     resetForm();
   }
@@ -127,32 +91,32 @@ export default function DebtStrategy() {
     setShowForm(false);
   }
 
-  function startEdit(d: Debt) {
+  function startEdit(d: any) {
     setCreditor(d.creditor);
     setAmount(String((d.amount / 100).toFixed(2)).replace(".", ","));
-    setPriority(d.priority);
+    setPriority(d.priority as DebtPriority);
     setEditingId(d.id);
     setShowForm(true);
   }
 
-  function removeDebt(id: string) {
-    save(debts.filter((d) => d.id !== id));
-    toast({ title: "Dívida removida" });
+  function removeDebt(id: number) {
+    deleteDebtMut(id, { onSuccess: () => toast({ title: "Dívida removida" }) });
   }
 
-  function markPaid(id: string) {
-    save(debts.map((d) => d.id === id ? { ...d, paid: true } : d));
-    toast({ title: "Dívida quitada!" });
+  function markPaid(id: number) {
+    updateDebtMut({ id, data: { paid: true } }, {
+      onSuccess: () => toast({ title: "Dívida quitada!" }),
+    });
   }
 
-  function markUnpaid(id: string) {
-    save(debts.map((d) => d.id === id ? { ...d, paid: false } : d));
+  function markUnpaid(id: number) {
+    updateDebtMut({ id, data: { paid: false } });
   }
 
   const activeDebts = debts.filter((d) => !d.paid);
   const paidDebts = debts.filter((d) => d.paid);
   const totalDebt = activeDebts.reduce((sum, d) => sum + d.amount, 0);
-  const sortedActive = [...activeDebts].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+  const sortedActive = [...activeDebts].sort((a, b) => (priorityOrder[a.priority as DebtPriority] ?? 1) - (priorityOrder[b.priority as DebtPriority] ?? 1));
 
   const formatValue = (value: number) => formatCurrency(value, user?.currency);
 
@@ -163,7 +127,7 @@ export default function DebtStrategy() {
     setShowSimModal(true);
   }
 
-  function openDebtSim(id: string) {
+  function openDebtSim(id: number) {
     setSimDebtId(id);
     setSimPayment("");
     setSimPriorityFilter("all");
@@ -186,7 +150,7 @@ export default function DebtStrategy() {
     return Math.ceil((total / 100) / payment);
   }
 
-  function addToProjections(debtId: string) {
+  function addToProjections(debtId: number) {
     if (!user?.id) return;
     const d = debts.find((x) => x.id === debtId);
     if (!d) return;
@@ -198,34 +162,25 @@ export default function DebtStrategy() {
     const installmentCents = Math.round(payment * 100);
     const months = Math.ceil(d.amount / installmentCents);
 
-    const commitmentsKey = getCommitmentsLsKey(user.id);
-    let commitments: any[] = [];
-    try {
-      const raw = localStorage.getItem(commitmentsKey);
-      if (raw) commitments = JSON.parse(raw) || [];
-    } catch {}
-
     const debtAccount = accounts?.find((a) => a.name.toLowerCase().includes("despesa") || a.name.toLowerCase().includes("contas"));
-    const accountId = debtAccount?.id || accounts?.[0]?.id || 0;
+    const debtAccountId = debtAccount?.id || accounts?.[0]?.id || 0;
 
-    const newCommitment = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      accountId,
+    createCommitment({
+      userId: user.id,
+      accountId: debtAccountId,
       description: `Pagamento Dívida: ${d.creditor}`,
       value: installmentCents,
       startDate: new Date().toISOString().split("T")[0],
       recurrence: months > 1 ? "PARCELADO" : "FIXO",
-      installments: months > 1 ? months : undefined,
-      category: "Pagamento de Dívida",
-      createdAt: new Date().toISOString(),
+      installments: months > 1 ? months : null,
+      category: "Compromissos Financeiros",
       commitmentType: "expense",
       paidPeriods: [],
-    };
-
-    commitments.push(newCommitment);
-    localStorage.setItem(commitmentsKey, JSON.stringify(commitments));
-
-    toast({ title: "Adicionado às Projeções", description: `${formatValue(installmentCents)}/mês por ${months} ${months === 1 ? "mês" : "meses"} para "${d.creditor}"` });
+    }, {
+      onSuccess: () => {
+        toast({ title: "Adicionado às Projeções", description: `${formatValue(installmentCents)}/mês por ${months} ${months === 1 ? "mês" : "meses"} para "${d.creditor}"` });
+      },
+    });
   }
 
   const monthlyPaymentCapacity = useMemo(() => {
@@ -335,21 +290,21 @@ export default function DebtStrategy() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="font-bold text-foreground" data-testid={`text-debt-creditor-${d.id}`}>{d.creditor}</h4>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${priorityColor[d.priority]}`} data-testid={`badge-priority-${d.id}`}>
-                      {priorityLabel[d.priority]}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${priorityColor[d.priority as DebtPriority]}`} data-testid={`badge-priority-${d.id}`}>
+                      {priorityLabel[d.priority as DebtPriority]}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">Registrada em {new Date(d.registeredDate + "T12:00:00").toLocaleDateString("pt-BR")}</p>
                   <p className="text-xl font-display font-bold text-destructive mt-1" data-testid={`text-debt-amount-${d.id}`}>{formatValue(d.amount)}</p>
                 </div>
-                <div className="flex flex-col gap-1 shrink-0">
-                  <Button variant="outline" size="sm" className="rounded-lg text-xs" onClick={() => startEdit(d)} data-testid={`button-edit-debt-${d.id}`}>
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  <Button variant="outline" size="sm" className="rounded-lg text-xs min-h-[36px] sm:min-h-0" onClick={() => startEdit(d)} data-testid={`button-edit-debt-${d.id}`}>
                     <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
                   </Button>
-                  <Button variant="outline" size="sm" className="rounded-lg text-xs" onClick={() => openDebtSim(d.id)} data-testid={`button-sim-debt-${d.id}`}>
+                  <Button variant="outline" size="sm" className="rounded-lg text-xs min-h-[36px] sm:min-h-0" onClick={() => openDebtSim(d.id)} data-testid={`button-sim-debt-${d.id}`}>
                     <Calculator className="w-3.5 h-3.5 mr-1" /> Simular
                   </Button>
-                  <Button variant="outline" size="sm" className="rounded-lg text-xs text-secondary border-secondary/30" onClick={() => markPaid(d.id)} data-testid={`button-pay-debt-${d.id}`}>
+                  <Button variant="outline" size="sm" className="rounded-lg text-xs min-h-[36px] sm:min-h-0 text-secondary border-secondary/30" onClick={() => markPaid(d.id)} data-testid={`button-pay-debt-${d.id}`}>
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Quitar
                   </Button>
                   <Button variant="ghost" size="sm" className="rounded-lg text-xs text-muted-foreground" onClick={() => removeDebt(d.id)} data-testid={`button-remove-debt-${d.id}`}>

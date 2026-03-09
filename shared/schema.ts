@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -40,6 +40,32 @@ export const transactions = pgTable("transactions", {
   category: text("category"),
 });
 
+export const commitments = pgTable("commitments", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  accountId: integer("account_id"),
+  description: text("description").notNull(),
+  value: integer("value").notNull(),
+  startDate: text("start_date").notNull(),
+  recurrence: text("recurrence").notNull(),
+  installments: integer("installments"),
+  category: text("category").notNull(),
+  commitmentType: text("commitment_type").notNull().default("expense"),
+  paidPeriods: text("paid_periods").array().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const debts = pgTable("debts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  creditor: text("creditor").notNull(),
+  amount: integer("amount").notNull(),
+  registeredDate: text("registered_date").notNull(),
+  priority: text("priority").notNull().default("medium"),
+  paid: boolean("paid").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, trialStartDate: true });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true });
 export const insertTransactionSchema = createInsertSchema(transactions)
@@ -48,6 +74,8 @@ export const insertTransactionSchema = createInsertSchema(transactions)
     amount: z.number(),
     accountId: z.number().optional().nullable(),
   });
+export const insertCommitmentSchema = createInsertSchema(commitments).omit({ id: true, createdAt: true });
+export const insertDebtSchema = createInsertSchema(debts).omit({ id: true, createdAt: true });
 
 export const registerSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -68,6 +96,12 @@ export type InsertAccount = z.infer<typeof insertAccountSchema>;
 
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+export type Commitment = typeof commitments.$inferSelect;
+export type InsertCommitment = z.infer<typeof insertCommitmentSchema>;
+
+export type Debt = typeof debts.$inferSelect;
+export type InsertDebt = z.infer<typeof insertDebtSchema>;
 
 export type UpdateAccountPercentagesRequest = {
   updates: { id: number; percentage: number }[];

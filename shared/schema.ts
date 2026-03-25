@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   planTier: text("plan_tier").notNull().default("free"),
   resetToken: text("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
+  trialExpiredEmailSent: boolean("trial_expired_email_sent").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

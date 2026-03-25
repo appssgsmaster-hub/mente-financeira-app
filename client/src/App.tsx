@@ -19,7 +19,8 @@ import DebtStrategy from "./pages/DebtStrategy";
 import ResetPassword from "./pages/ResetPassword";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUse from "./pages/TermsOfUse";
-import { Loader2 } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 function PublicRoutes() {
   return (
@@ -28,6 +29,36 @@ function PublicRoutes() {
       <Route path="/terms-of-use" component={TermsOfUse} />
       <Route path="/reset-password" component={ResetPassword} />
     </Switch>
+  );
+}
+
+function ExpiredLayout({ children }: { children: React.ReactNode }) {
+  const { user, logout } = useAuth();
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="h-14 flex items-center justify-between px-4 sm:px-8 border-b border-border/40 bg-background/80 backdrop-blur-md shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-sm">
+            <span className="text-white font-bold text-xs tracking-tight">MF</span>
+          </div>
+          <span className="font-bold font-display text-primary text-base">Mente Financeira</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {user?.name && (
+            <span className="text-sm text-muted-foreground hidden sm:block truncate max-w-[160px]">{user.name}</span>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => logout()} className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive" data-testid="button-logout-expired">
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Sair</span>
+          </Button>
+        </div>
+      </header>
+      <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-10">
+        <div className="max-w-7xl mx-auto">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }
 
@@ -58,14 +89,9 @@ function AppRoutes() {
 
   if (isExpired) {
     return (
-      <MainLayout>
-        <Switch>
-          <Route path="/planos" component={Plans} />
-          <Route>
-            <Plans />
-          </Route>
-        </Switch>
-      </MainLayout>
+      <ExpiredLayout>
+        <Plans />
+      </ExpiredLayout>
     );
   }
 

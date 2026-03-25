@@ -1,0 +1,60 @@
+Please fix the subscription flow in my app.
+
+Current issue:
+When the free plan expires, the subscription screen starts blinking/flickering and the user cannot select a paid plan. The screen does not obey the command to subscribe, making it impossible to choose a plan and proceed.
+
+What needs to be fixed:
+
+1. Free plan duration
+- Change the free plan duration to 7 days only.
+- After 7 days, the free plan must expire automatically.
+
+2. Expired free plan behavior
+- When the 7-day free plan expires, the user must no longer have access to premium/app features that require an active subscription.
+- Redirect the user to a stable subscription/upgrade screen.
+- This screen must NOT flicker, reload repeatedly, or loop.
+
+3. Subscription page stability
+- Stop any re-render loop, redirect loop, auth loop, or state update loop causing the blinking.
+- The plan selection area must remain stable and clickable.
+- The user must be able to clearly select a plan and continue to checkout.
+
+4. Notification email
+- Add an automatic email notification to be sent when the free plan expires.
+- The email should clearly inform the customer that the free trial has ended and that they need to choose a paid plan to continue using the app.
+- Make sure the email is triggered only once per expiration event.
+- Check why Brazza did not receive this notification email and fix the logic.
+
+5. Backend checks
+- Review subscription status logic in both frontend and backend.
+- Confirm date calculation is correct for trial start date and expiration date.
+- Make sure timezone handling does not cause early/late expiry.
+- Ensure customer record is updated properly when trial expires.
+
+6. UX improvements
+- Show a clear message on screen such as:
+  “Your 7-day free trial has expired. Please choose a plan to continue.”
+- Add a loading state if necessary, but no blinking.
+- Disable repeated redirects.
+- If the user already has an active plan, do not show the expired screen.
+
+7. Debugging
+- Identify the root cause of the blinking issue.
+- Check useEffect dependencies, subscription state listeners, auth/session refresh, and route guards.
+- Add safe guards so the page renders only after subscription status is fully loaded.
+
+8. Testing
+Please test these scenarios:
+- New user starts free plan
+- Free plan active within 7 days
+- Free plan expired after 7 days
+- Expired user opens app and sees stable upgrade screen
+- User selects a paid plan successfully
+- Expiration email is sent correctly
+- No duplicate email is sent
+- No flickering happens on subscription page
+
+Important:
+Do not just patch visually. Fix the root cause.
+Please keep the subscription flow clean, stable, and production-ready.
+Also tell me exactly which files were changed and what was fixed.

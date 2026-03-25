@@ -7,7 +7,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
-import { sendPasswordResetEmail } from "./email";
+import { sendPasswordResetEmail, sendTrialExpiredEmail } from "./email";
 
 declare module "express-session" {
   interface SessionData {
@@ -20,6 +20,16 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ message: "Não autenticado" });
   }
   next();
+}
+
+async function markTrialExpiredAndNotify(user: { id: number; email: string; name: string; trialExpiredEmailSent: boolean }) {
+  await storage.updateUser(user.id, { subscriptionStatus: "trial_expired" });
+  if (!user.trialExpiredEmailSent) {
+    await storage.updateUser(user.id, { trialExpiredEmailSent: true });
+    sendTrialExpiredEmail(user.email, user.name).catch((err) => {
+      console.error("Failed to send trial expired email:", err);
+    });
+  }
 }
 
 async function requireActiveSubscription(req: Request, res: Response, next: NextFunction) {
@@ -40,11 +50,11 @@ async function requireActiveSubscription(req: Request, res: Response, next: Next
     if (user.trialEndDate && new Date(user.trialEndDate) > new Date()) {
       return next();
     }
-    await storage.updateUser(user.id, { subscriptionStatus: "trial_expired" });
-    return res.status(403).json({ message: "Período de teste expirado", code: "TRIAL_EXPIRED" });
+    await markTrialExpiredAndNotify(user);
+    return res.status(403).json({ message: "Período de teste expirou. Escolha um plano para continuar.", code: "TRIAL_EXPIRED" });
   }
 
-  return res.status(403).json({ message: "Assinatura inativa", code: "SUBSCRIPTION_INACTIVE" });
+  return res.status(403).json({ message: "Assinatura inativa. Escolha um plano para continuar.", code: "SUBSCRIPTION_INACTIVE" });
 }
 
 export async function registerRoutes(
@@ -186,11 +196,11 @@ export async function registerRoutes(
     }
 
     if (user.subscriptionStatus === "trial" && user.trialEndDate && new Date(user.trialEndDate) <= new Date()) {
-      await storage.updateUser(user.id, { subscriptionStatus: "trial_expired" });
+      await markTrialExpiredAndNotify(user);
       user.subscriptionStatus = "trial_expired";
     }
 
-    if (user.stripeCustomerId && (user.planTier === "free" || user.subscriptionStatus === "trial" || user.subscriptionStatus === "trial_expired")) {
+    if (user.stripeCustomerId && (user.planTier === "free" || user.subscriptionStatus === "trial")) {
       try {
         const stripe = await getUncachableStripeClient();
         const PRICE_TO_TIER: Record<string, string> = {
@@ -484,7 +494,7 @@ export async function registerRoutes(
 
       const successUrl = planTier === 'mentoria'
         ? `${baseUrl}/mentoria/boas-vindas?status=success&tier=${planTier}`
-        : `${baseUrl}/?status=success&tier=${planTier}`;
+        : `${baseUrl}/planos?status=success&tier=${planTier}`;
 
       const sessionConfig: any = {
         customer: customerId,

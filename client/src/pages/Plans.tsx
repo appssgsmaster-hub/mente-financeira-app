@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Star, Check, Zap, Loader2, AlertTriangle, Crown, Sparkles, Brain, Rocket, BookOpen, Users } from "lucide-react";
@@ -19,6 +19,7 @@ export default function Plans() {
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const syncedRef = useRef(false);
 
   const currentTier = (user as any)?.planTier || "free";
   const currentTierLevel = TIER_HIERARCHY[currentTier] || 0;
@@ -38,9 +39,11 @@ export default function Plans() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("status") === "success" && !syncing) {
+    if (params.get("status") === "success" && !syncedRef.current) {
+      syncedRef.current = true;
       const tier = params.get("tier") || "app";
       setSyncing(true);
+      window.history.replaceState({}, "", "/planos");
       syncPurchase(tier);
     }
   }, []);
@@ -50,13 +53,26 @@ export default function Plans() {
       const res = await apiRequest("POST", "/api/stripe/sync-purchase", { planTier: tier });
       const data = await res.json();
       if (data.status === "active") {
-        toast({ title: "Compra confirmada!", description: `Seu plano ${TIER_LABELS[tier] || tier} foi ativado com sucesso.` });
-        refetchUser();
+        toast({ title: "Compra confirmada! 🎉", description: `Seu plano ${TIER_LABELS[tier] || tier} foi ativado com sucesso.` });
+        await refetchUser();
+      } else {
+        toast({ title: "A verificar pagamento...", description: "Se o problema persistir, contacte o suporte.", variant: "destructive" });
       }
-    } catch {} finally {
+    } catch {
+      toast({ title: "Erro ao confirmar compra", description: "Tente actualizar a página.", variant: "destructive" });
+    } finally {
       setSyncing(false);
-      window.history.replaceState({}, "", "/planos");
     }
+  }
+
+  if (syncing) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4" data-testid="state-syncing-purchase">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+        <p className="text-lg font-display font-semibold text-foreground">A confirmar o seu pagamento…</p>
+        <p className="text-sm text-muted-foreground">Por favor aguarde um momento.</p>
+      </div>
+    );
   }
 
   async function handleCheckout(tier: string) {
@@ -140,10 +156,10 @@ export default function Plans() {
         <Card className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl border-border/50 bg-card flex flex-col">
           <div className="mb-5 sm:mb-6">
             <h3 className="text-lg font-bold font-display text-foreground" data-testid="text-plan-trial">Teste Gratuito</h3>
-            <p className="text-xs text-muted-foreground mt-1">15 dias para explorar</p>
+            <p className="text-xs text-muted-foreground mt-1">7 dias para explorar</p>
             <div className="mt-3 sm:mt-4 font-display">
               <span className="text-2xl sm:text-3xl font-bold text-foreground">€0</span>
-              <span className="text-muted-foreground ml-2 text-xs">/15 dias</span>
+              <span className="text-muted-foreground ml-2 text-xs">/7 dias</span>
             </div>
           </div>
           <ul className="space-y-2.5 mb-6 flex-1">

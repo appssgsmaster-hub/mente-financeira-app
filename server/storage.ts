@@ -61,7 +61,7 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(data: { name: string; email: string; passwordHash: string }): Promise<User> {
     const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 15);
+    trialEnd.setDate(trialEnd.getDate() + 7);
 
     const [user] = await db.insert(users).values({
       name: data.name,

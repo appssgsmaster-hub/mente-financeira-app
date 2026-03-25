@@ -19,7 +19,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 ## Key Features
 - Multi-user authentication (register/login with email+password, bcrypt 12 rounds, forgot/reset password via email)
 - GDPR compliance: consent checkbox on registration, Privacy Policy & Terms of Use pages
-- 15-day free trial for new users
+- 7-day free trial for new users (down from 15)
 - Tiered one-time payment plans via Stripe (€47 / €197 / €697)
 - Plan upgrades between tiers
 - Dashboard upgrade prompts for Method and Mentorship

@@ -21,7 +21,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  refetchUser: () => void;
+  refetchUser: () => Promise<unknown>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);

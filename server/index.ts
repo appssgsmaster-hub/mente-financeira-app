@@ -110,15 +110,15 @@ app.use((req, res, next) => {
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    console.warn('DATABASE_URL not set, skipping Stripe init');
+    console.warn('[stripe] DATABASE_URL not set, skipping Stripe init');
     return;
   }
 
   try {
     const { runMigrations } = await import('stripe-replit-sync');
-    console.log('Initializing Stripe schema...');
+    console.log('[stripe] Initializing schema...');
     await runMigrations({ databaseUrl, schema: 'stripe' });
-    console.log('Stripe schema ready');
+    console.log('[stripe] Schema ready');
 
     const { getStripeSync } = await import('./stripeClient');
     const stripeSync = await getStripeSync();
@@ -131,25 +131,43 @@ async function initStripe() {
           `${webhookBaseUrl}/api/stripe/webhook`
         );
         if (result?.webhook) {
-          console.log(`Webhook configured: ${result.webhook.url}`);
+          console.log(`[stripe] Webhook configured: ${result.webhook.url}`);
         }
       } catch (webhookErr: any) {
-        console.warn('Webhook setup skipped:', webhookErr.message);
+        console.warn('[stripe] Webhook setup skipped:', webhookErr.message);
       }
     } else {
-      console.warn('REPLIT_DOMAINS not set, skipping webhook setup');
+      console.warn('[stripe] REPLIT_DOMAINS not set, skipping webhook setup');
     }
 
     stripeSync.syncBackfill()
-      .then(() => console.log('Stripe data synced'))
-      .catch((err: any) => console.error('Error syncing Stripe data:', err));
+      .then(() => console.log('[stripe] Data synced'))
+      .catch((err: any) => console.error('[stripe] Sync error:', err));
   } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
+    console.error('[stripe] Failed to initialize:', error);
   }
 }
 
 (async () => {
-  await initStripe();
+  console.log(`[boot] server/index.cjs starting`);
+  console.log(`[boot] NODE_ENV=${process.env.NODE_ENV}`);
+
+  const portEnvRaw = process.env.PORT;
+  const port = parseInt(portEnvRaw || "5000", 10);
+  console.log(`[boot] PORT=${portEnvRaw ?? "(not set, using fallback 5000)"} → listening on ${port}`);
+
+  if (!process.env.DATABASE_URL) {
+    console.error('[boot] FATAL: DATABASE_URL is not set');
+    process.exit(1);
+  }
+  console.log('[boot] DATABASE_URL is set');
+
+  if (!process.env.SESSION_SECRET) {
+    console.error('[boot] FATAL: SESSION_SECRET is not set');
+    process.exit(1);
+  }
+  console.log('[boot] SESSION_SECRET is set');
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -165,14 +183,13 @@ async function initStripe() {
     return res.status(status).json({ message });
   });
 
-  if (process.env.NODE_ENV === "production") {
+  if (isProduction) {
     serveStatic(app);
   } else {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
 
-  const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
       port,
@@ -181,6 +198,8 @@ async function initStripe() {
     },
     () => {
       log(`serving on port ${port}`);
+      console.log(`[boot] ✓ HTTP server listening on 0.0.0.0:${port}`);
+      initStripe().catch((err) => console.error('[stripe] Background init error:', err));
     },
   );
 })();

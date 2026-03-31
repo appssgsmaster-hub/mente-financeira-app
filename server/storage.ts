@@ -35,6 +35,54 @@ function distributeWithLargestRemainder(
   return shares.map(s => ({ id: s.id, share: s.share }));
 }
 
+async function computeDerivedBalances(userId: number, userAccounts: Account[]): Promise<Account[]> {
+  const userTxs = await db.select().from(transactions).where(eq(transactions.userId, userId));
+
+  if (userTxs.length === 0) {
+    return userAccounts.map(a => ({ ...a, balance: 0 }));
+  }
+
+  const allocResult = await db.execute(
+    sql`SELECT ta.transaction_id, ta.account_id, ta.amount
+        FROM transaction_allocations ta
+        INNER JOIN transactions t ON t.id = ta.transaction_id
+        WHERE t.user_id = ${userId}`
+  );
+
+  const allocsByTxId = new Map<number, Map<number, number>>();
+  for (const row of allocResult.rows as any[]) {
+    const txId = Number(row.transaction_id);
+    if (!allocsByTxId.has(txId)) allocsByTxId.set(txId, new Map());
+    allocsByTxId.get(txId)!.set(Number(row.account_id), Number(row.amount));
+  }
+
+  const balanceMap = new Map<number, number>(userAccounts.map(a => [a.id, 0]));
+
+  for (const tx of userTxs) {
+    if (tx.type === 'income') {
+      const allocations = allocsByTxId.get(tx.id);
+      if (allocations && allocations.size > 0) {
+        for (const [accountId, amount] of allocations) {
+          if (balanceMap.has(accountId)) {
+            balanceMap.set(accountId, (balanceMap.get(accountId) || 0) + amount);
+          }
+        }
+      } else {
+        const shares = distributeWithLargestRemainder(tx.amount, userAccounts);
+        for (const s of shares) {
+          balanceMap.set(s.id, (balanceMap.get(s.id) || 0) + s.share);
+        }
+      }
+    } else if (tx.type === 'expense' && tx.accountId) {
+      if (balanceMap.has(tx.accountId)) {
+        balanceMap.set(tx.accountId, (balanceMap.get(tx.accountId) || 0) - tx.amount);
+      }
+    }
+  }
+
+  return userAccounts.map(a => ({ ...a, balance: balanceMap.get(a.id) ?? 0 }));
+}
+
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -121,7 +169,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAccounts(userId: number): Promise<Account[]> {
-    return await db.select().from(accounts).where(eq(accounts.userId, userId));
+    const userAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
+    if (userAccounts.length === 0) return [];
+    return computeDerivedBalances(userId, userAccounts);
   }
 
   async updateAccountPercentages(userId: number, updates: UpdateAccountPercentagesRequest['updates'], redistribute: boolean = false): Promise<Account[]> {
@@ -138,43 +188,32 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    if (redistribute) {
-      const totalBalance = userAccounts.reduce((sum, a) => sum + a.balance, 0);
-
-      const shares = updates.map(u => ({
-        ...u,
-        exact: totalBalance * (u.percentage / 100),
-        floored: Math.floor(totalBalance * (u.percentage / 100)),
-      }));
-      shares.forEach(s => { s.exact = s.exact - s.floored; });
-      let remainder = totalBalance - shares.reduce((sum, s) => sum + s.floored, 0);
-      const byRemainder = [...shares].sort((a, b) => b.exact - a.exact);
-      for (const s of byRemainder) {
-        if (remainder <= 0) break;
-        s.floored += 1;
-        remainder -= 1;
-      }
-
-      const updatedAccounts = [];
-      for (const share of shares) {
-        const [acc] = await db.update(accounts)
-          .set({ percentage: share.percentage, balance: share.floored })
-          .where(and(eq(accounts.id, share.id), eq(accounts.userId, userId)))
-          .returning();
-        if (acc) updatedAccounts.push(acc);
-      }
-      return updatedAccounts;
-    }
-
-    const updatedAccounts = [];
+    const updatedRaw: Account[] = [];
     for (const update of updates) {
       const [acc] = await db.update(accounts)
         .set({ percentage: update.percentage })
         .where(and(eq(accounts.id, update.id), eq(accounts.userId, userId)))
         .returning();
-      if (acc) updatedAccounts.push(acc);
+      if (acc) updatedRaw.push(acc);
     }
-    return updatedAccounts;
+
+    if (redistribute) {
+      const incomeTxs = await db.select().from(transactions)
+        .where(and(eq(transactions.userId, userId), eq(transactions.type, 'income')));
+      if (incomeTxs.length > 0) {
+        for (const tx of incomeTxs) {
+          await db.delete(transactionAllocations).where(eq(transactionAllocations.transactionId, tx.id));
+        }
+        const newAllocs: { transactionId: number; accountId: number; amount: number }[] = [];
+        for (const tx of incomeTxs) {
+          const shares = distributeWithLargestRemainder(tx.amount, updatedRaw);
+          for (const s of shares) newAllocs.push({ transactionId: tx.id, accountId: s.id, amount: s.share });
+        }
+        if (newAllocs.length > 0) await db.insert(transactionAllocations).values(newAllocs);
+      }
+    }
+
+    return computeDerivedBalances(userId, updatedRaw);
   }
 
   async getTransactions(userId: number): Promise<Transaction[]> {
@@ -184,20 +223,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    if (transaction.type === 'expense' && transaction.accountId) {
-      const [account] = await db.select().from(accounts).where(eq(accounts.id, transaction.accountId));
-      if (account) {
-        await db.update(accounts)
-          .set({ balance: account.balance - transaction.amount })
-          .where(eq(accounts.id, transaction.accountId));
-      }
-    }
     const [newTx] = await db.insert(transactions).values(transaction).returning();
     return newTx;
   }
 
   async distributeIncome(userId: number, request: DistributeIncomeRequest, date?: Date): Promise<{ transaction: Transaction; updatedAccounts: Account[] }> {
-    const userAccounts = await this.getAccounts(userId);
+    const rawAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
     const txValues: any = {
       userId,
       description: request.description,
@@ -208,9 +239,8 @@ export class DatabaseStorage implements IStorage {
     if (date) txValues.date = date;
     const [newTx] = await db.insert(transactions).values(txValues).returning();
 
-    const shares = distributeWithLargestRemainder(request.amount, userAccounts);
-
-    console.log(`[distributeIncome] entrada=${request.amount} cents (€${(request.amount/100).toFixed(2)})`);
+    const shares = distributeWithLargestRemainder(request.amount, rawAccounts);
+    console.log(`[distributeIncome] entrada=${request.amount} cents partilhas=${JSON.stringify(shares)}`);
 
     if (shares.length > 0) {
       await db.insert(transactionAllocations).values(
@@ -218,64 +248,14 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    const updatedAccounts = [];
-    for (const s of shares) {
-      const acc = userAccounts.find(a => a.id === s.id)!;
-      const [updated] = await db.update(accounts)
-        .set({ balance: acc.balance + s.share })
-        .where(eq(accounts.id, s.id))
-        .returning();
-      if (updated) {
-        console.log(`  conta=${acc.name} share=${s.share} cents novo_saldo=${updated.balance}`);
-        updatedAccounts.push(updated);
-      }
-    }
-
-    const totalDistributed = shares.reduce((sum, s) => sum + s.share, 0);
-    console.log(`[distributeIncome] total_distribuído=${totalDistributed} ecossistema_total=${updatedAccounts.reduce((s, a) => s + a.balance, 0)}`);
+    const updatedAccounts = await computeDerivedBalances(userId, rawAccounts);
     return { transaction: newTx, updatedAccounts };
   }
 
   async deleteTransaction(id: number): Promise<void> {
     const [tx] = await db.select().from(transactions).where(eq(transactions.id, id));
     if (!tx) throw new Error("Transação não encontrada");
-
-    if (tx.type === 'expense' && tx.accountId) {
-      const [acc] = await db.select().from(accounts).where(eq(accounts.id, tx.accountId));
-      if (acc) {
-        await db.update(accounts)
-          .set({ balance: acc.balance + tx.amount })
-          .where(eq(accounts.id, tx.accountId));
-        console.log(`[deleteTransaction] saída revertida: conta=${acc.name} +${tx.amount}`);
-      }
-    } else if (tx.type === 'income') {
-      const storedAllocations = await db.select().from(transactionAllocations)
-        .where(eq(transactionAllocations.transactionId, id));
-
-      if (storedAllocations.length > 0) {
-        for (const alloc of storedAllocations) {
-          const [acc] = await db.select().from(accounts).where(eq(accounts.id, alloc.accountId));
-          if (acc) {
-            await db.update(accounts)
-              .set({ balance: acc.balance - alloc.amount })
-              .where(eq(accounts.id, alloc.accountId));
-            console.log(`[deleteTransaction] entrada revertida (alocação): conta=${acc.name} -${alloc.amount}`);
-          }
-        }
-      } else {
-        const userAccounts = await db.select().from(accounts).where(eq(accounts.userId, tx.userId));
-        const shares = distributeWithLargestRemainder(tx.amount, userAccounts);
-        for (const s of shares) {
-          const acc = userAccounts.find(a => a.id === s.id)!;
-          await db.update(accounts)
-            .set({ balance: acc.balance - s.share })
-            .where(eq(accounts.id, s.id));
-          console.log(`[deleteTransaction] entrada revertida (recálculo): conta=${acc.name} -${s.share}`);
-        }
-      }
-
-      await db.delete(transactionAllocations).where(eq(transactionAllocations.transactionId, id));
-    }
+    await db.delete(transactionAllocations).where(eq(transactionAllocations.transactionId, id));
     await db.delete(transactions).where(eq(transactions.id, id));
   }
 
@@ -295,54 +275,16 @@ export class DatabaseStorage implements IStorage {
     const [oldTx] = await db.select().from(transactions).where(eq(transactions.id, id));
     if (!oldTx) throw new Error("Transação não encontrada");
 
-    if (data.amount !== undefined && data.amount !== oldTx.amount) {
-      if (oldTx.type === 'expense' && oldTx.accountId) {
-        const [acc] = await db.select().from(accounts).where(eq(accounts.id, oldTx.accountId));
-        if (acc) {
-          const diff = data.amount - oldTx.amount;
-          await db.update(accounts)
-            .set({ balance: acc.balance - diff })
-            .where(eq(accounts.id, oldTx.accountId));
-          console.log(`[updateTransaction] saída editada: conta_id=${oldTx.accountId} diff=${diff}`);
-        }
-      } else if (oldTx.type === 'income') {
-        const storedAllocations = await db.select().from(transactionAllocations)
-          .where(eq(transactionAllocations.transactionId, id));
-        const userAccounts = await db.select().from(accounts).where(eq(accounts.userId, oldTx.userId));
-
-        if (storedAllocations.length > 0) {
-          for (const alloc of storedAllocations) {
-            const acc = userAccounts.find(a => a.id === alloc.accountId);
-            if (acc) {
-              await db.update(accounts)
-                .set({ balance: acc.balance - alloc.amount })
-                .where(eq(accounts.id, alloc.accountId));
-            }
-          }
-          await db.delete(transactionAllocations).where(eq(transactionAllocations.transactionId, id));
-        } else {
-          const oldShares = distributeWithLargestRemainder(oldTx.amount, userAccounts);
-          for (const s of oldShares) {
-            const acc = userAccounts.find(a => a.id === s.id)!;
-            await db.update(accounts)
-              .set({ balance: acc.balance - s.share })
-              .where(eq(accounts.id, s.id));
-          }
-        }
-
-        const refreshedAccounts = await db.select().from(accounts).where(eq(accounts.userId, oldTx.userId));
-        const newShares = distributeWithLargestRemainder(data.amount, refreshedAccounts);
+    if (data.amount !== undefined && data.amount !== oldTx.amount && oldTx.type === 'income') {
+      const rawAccounts = await db.select().from(accounts).where(eq(accounts.userId, oldTx.userId));
+      await db.delete(transactionAllocations).where(eq(transactionAllocations.transactionId, id));
+      const newShares = distributeWithLargestRemainder(data.amount, rawAccounts);
+      if (newShares.length > 0) {
         await db.insert(transactionAllocations).values(
           newShares.map(s => ({ transactionId: id, accountId: s.id, amount: s.share }))
         );
-        for (const s of newShares) {
-          const acc = refreshedAccounts.find(a => a.id === s.id)!;
-          await db.update(accounts)
-            .set({ balance: acc.balance + s.share })
-            .where(eq(accounts.id, s.id));
-          console.log(`[updateTransaction] entrada editada: conta=${acc.name} novo_share=${s.share}`);
-        }
       }
+      console.log(`[updateTransaction] entrada editada: novo_valor=${data.amount} partilhas=${JSON.stringify(newShares)}`);
     }
 
     const [updated] = await db.update(transactions)
@@ -407,18 +349,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async resetAllData(userId: number): Promise<void> {
-    const txIds = await db.select({ id: transactions.id })
-      .from(transactions)
-      .where(eq(transactions.userId, userId));
-    if (txIds.length > 0) {
-      for (const { id: txId } of txIds) {
-        await db.delete(transactionAllocations).where(eq(transactionAllocations.transactionId, txId));
-      }
-    }
+    await db.execute(
+      sql`DELETE FROM transaction_allocations WHERE transaction_id IN (
+            SELECT id FROM transactions WHERE user_id = ${userId}
+          )`
+    );
     await db.delete(transactions).where(eq(transactions.userId, userId));
-    await db.update(accounts)
-      .set({ balance: 0 })
-      .where(eq(accounts.userId, userId));
   }
 
   async getCommitments(userId: number): Promise<Commitment[]> {
@@ -476,73 +412,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   async recalculateAccountBalances(userId: number): Promise<Account[]> {
-    const userAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
-    const balanceMap = new Map<number, number>(userAccounts.map(a => [a.id, 0]));
+    const rawAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
+    if (rawAccounts.length === 0) return [];
 
-    const userTransactions = await db.select().from(transactions)
-      .where(eq(transactions.userId, userId))
+    const incomeTxs = await db.select().from(transactions)
+      .where(and(eq(transactions.userId, userId), eq(transactions.type, 'income')))
       .orderBy(asc(transactions.date));
 
-    const existingAllocations = await db.execute(
-      sql`SELECT ta.* FROM transaction_allocations ta
+    const existingAllocResult = await db.execute(
+      sql`SELECT ta.transaction_id FROM transaction_allocations ta
           JOIN transactions t ON t.id = ta.transaction_id
-          WHERE t.user_id = ${userId}`
+          WHERE t.user_id = ${userId} GROUP BY ta.transaction_id`
     );
-    const allocsByTxId = new Map<number, { accountId: number; amount: number }[]>();
-    for (const row of existingAllocations.rows as any[]) {
-      const txId = row.transaction_id;
-      if (!allocsByTxId.has(txId)) allocsByTxId.set(txId, []);
-      allocsByTxId.get(txId)!.push({ accountId: row.account_id, amount: row.amount });
-    }
+    const txsWithAllocations = new Set((existingAllocResult.rows as any[]).map(r => Number(r.transaction_id)));
 
-    const newAllocationsToInsert: { transactionId: number; accountId: number; amount: number }[] = [];
-
-    for (const tx of userTransactions) {
-      if (tx.type === 'income') {
-        const existingAlloc = allocsByTxId.get(tx.id);
-        if (existingAlloc && existingAlloc.length > 0) {
-          for (const alloc of existingAlloc) {
-            if (balanceMap.has(alloc.accountId)) {
-              balanceMap.set(alloc.accountId, (balanceMap.get(alloc.accountId) || 0) + alloc.amount);
-            }
-          }
-        } else {
-          const shares = distributeWithLargestRemainder(tx.amount, userAccounts);
-          for (const s of shares) {
-            balanceMap.set(s.id, (balanceMap.get(s.id) || 0) + s.share);
-            newAllocationsToInsert.push({ transactionId: tx.id, accountId: s.id, amount: s.share });
-          }
-        }
-      } else if (tx.type === 'expense' && tx.accountId) {
-        if (balanceMap.has(tx.accountId)) {
-          balanceMap.set(tx.accountId, (balanceMap.get(tx.accountId) || 0) - tx.amount);
-        }
+    const newAllocs: { transactionId: number; accountId: number; amount: number }[] = [];
+    for (const tx of incomeTxs) {
+      if (!txsWithAllocations.has(tx.id)) {
+        const shares = distributeWithLargestRemainder(tx.amount, rawAccounts);
+        for (const s of shares) newAllocs.push({ transactionId: tx.id, accountId: s.id, amount: s.share });
       }
     }
-
-    if (newAllocationsToInsert.length > 0) {
-      await db.insert(transactionAllocations).values(newAllocationsToInsert);
+    if (newAllocs.length > 0) {
+      console.log(`[recalculate] criando ${newAllocs.length} alocações em falta`);
+      await db.insert(transactionAllocations).values(newAllocs);
     }
 
-    const updatedAccounts: Account[] = [];
-    for (const acc of userAccounts) {
-      const newBalance = balanceMap.get(acc.id) ?? 0;
-      const [updated] = await db.update(accounts)
-        .set({ balance: newBalance })
-        .where(eq(accounts.id, acc.id))
-        .returning();
-      if (updated) {
-        console.log(`[recalculate] conta=${acc.name} saldo_antigo=${acc.balance} saldo_novo=${newBalance}`);
-        updatedAccounts.push(updated);
-      }
-    }
-
-    const ecosystemTotal = updatedAccounts.reduce((sum, a) => sum + a.balance, 0);
-    const incomeTotal = userTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const expenseTotal = userTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const result = await computeDerivedBalances(userId, rawAccounts);
+    const ecosystemTotal = result.reduce((sum, a) => sum + a.balance, 0);
+    const incomeTotal = incomeTxs.reduce((sum, t) => sum + t.amount, 0);
+    const expenseTxs = await db.select().from(transactions)
+      .where(and(eq(transactions.userId, userId), eq(transactions.type, 'expense')));
+    const expenseTotal = expenseTxs.reduce((sum, t) => sum + t.amount, 0);
     console.log(`[recalculate] ecossistema=${ecosystemTotal} entradas=${incomeTotal} saídas=${expenseTotal} diff=${ecosystemTotal - (incomeTotal - expenseTotal)}`);
-
-    return updatedAccounts;
+    return result;
   }
 
   async getStripeProduct(productId: string): Promise<any> {

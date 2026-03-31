@@ -316,6 +316,16 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/accounts/recalculate", requireActiveSubscription, async (req, res) => {
+    try {
+      const updatedAccounts = await storage.recalculateAccountBalances(req.session.userId!);
+      res.json(updatedAccounts);
+    } catch (err) {
+      console.error("Recalculate error:", err);
+      res.status(500).json({ message: "Erro ao recalcular saldos" });
+    }
+  });
+
   app.get(api.transactions.list.path, requireActiveSubscription, async (req, res) => {
     const userTransactions = await storage.getTransactions(req.session.userId!);
     res.json(userTransactions);

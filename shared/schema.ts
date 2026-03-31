@@ -56,6 +56,13 @@ export const commitments = pgTable("commitments", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const transactionAllocations = pgTable("transaction_allocations", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  amount: integer("amount").notNull(),
+});
+
 export const debts = pgTable("debts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -103,6 +110,8 @@ export type InsertCommitment = z.infer<typeof insertCommitmentSchema>;
 
 export type Debt = typeof debts.$inferSelect;
 export type InsertDebt = z.infer<typeof insertDebtSchema>;
+
+export type TransactionAllocation = typeof transactionAllocations.$inferSelect;
 
 export type UpdateAccountPercentagesRequest = {
   updates: { id: number; percentage: number }[];

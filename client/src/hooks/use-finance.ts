@@ -113,7 +113,7 @@ export function useCreateTransaction() {
 export function useDistributeIncome() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { amount: number; description: string }) => {
+    mutationFn: async (data: { amount: number; description: string; date?: string }) => {
       return fetchWithZod<{
         transaction: Transaction;
         updatedAccounts: Account[];
@@ -286,6 +286,18 @@ export function useDeleteDebt() {
       apiFetch<{ ok: true }>(`/api/debts/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
+    },
+  });
+}
+
+export function useRecalculateBalances() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<Account[]>("/api/accounts/recalculate", { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.transactions.list.path] });
     },
   });
 }

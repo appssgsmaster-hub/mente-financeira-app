@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useAccounts, useTransactions, useUser, useCommitments, useDebts } from "@/hooks/use-finance";
+import { useAccounts, useTransactions, useUser, useCommitments, useDebts, useRecalculateBalances } from "@/hooks/use-finance";
+import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,6 +52,8 @@ export default function Dashboard() {
   const { data: user } = useUser();
   const [, navigate] = useLocation();
   const planTier = (user as any)?.planTier || "free";
+  const { toast } = useToast();
+  const { mutate: recalculate, isPending: isRecalculating } = useRecalculateBalances();
 
   const totalBalance =
     accounts?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
@@ -217,10 +220,27 @@ export default function Dashboard() {
     <div className="space-y-8 pb-12">
       <div className="flex items-center justify-between">
         <h1 className="text-xl sm:text-2xl font-display font-bold text-foreground">Painel Financeiro</h1>
-        <Button variant="outline" size="sm" onClick={downloadReport} className="gap-2" data-testid="button-download-report">
-          <Download className="w-4 h-4" />
-          <span className="hidden sm:inline">Baixar Relatório</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => recalculate(undefined, {
+              onSuccess: () => toast({ title: "Saldos recalculados", description: "Os saldos das contas foram corrigidos com base nas transações." }),
+              onError: () => toast({ title: "Erro", description: "Não foi possível recalcular os saldos.", variant: "destructive" }),
+            })}
+            disabled={isRecalculating}
+            className="gap-2"
+            data-testid="button-recalculate"
+            title="Recalcular saldos com base nas transações registradas"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRecalculating ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">{isRecalculating ? "Recalculando..." : "Recalcular Saldos"}</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={downloadReport} className="gap-2" data-testid="button-download-report">
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Baixar Relatório</span>
+          </Button>
+        </div>
       </div>
       {/* 1 — ECOSSISTEMA TOTAL + DONUT ROW */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

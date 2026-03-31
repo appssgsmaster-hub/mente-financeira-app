@@ -1,0 +1,129 @@
+Preciso corrigir com urgência a lógica financeira do app. Hoje o “Ecossistema Total” e os saldos das contas estão incorretos após lançar entradas e saídas.
+
+PROBLEMA IDENTIFICADO:
+1. O Ecossistema Total não está batendo com a fórmula correta.
+2. As cinco contas estão com saldos errados após registrar saídas.
+3. As porcentagens parecem estar sendo distribuídas de forma incorreta.
+4. O sistema pode estar redistribuindo valores antigos ou recalculando sobre o saldo total, quando deveria distribuir apenas sobre novas entradas.
+5. O total das saídas lançadas não está refletindo corretamente nem no ecossistema nem nas contas.
+
+REGRAS CORRETAS QUE O SISTEMA DEVE SEGUIR:
+
+1. ECOSSISTEMA TOTAL
+O valor do “Ecossistema Total” deve ser:
+TOTAL DE ENTRADAS – TOTAL DE SAÍDAS
+ou, equivalentemente:
+SOMA DOS SALDOS REAIS DE TODAS AS CONTAS
+
+Esses dois valores devem sempre bater.
+
+2. DISTRIBUIÇÃO DAS ENTRADAS
+Cada nova entrada deve ser distribuída SOMENTE no momento em que for lançada, de acordo com os percentuais definidos nas contas.
+Exemplo:
+Se entrar €1.000 e as contas forem:
+- Reserva: 3%
+- Pro-labore: 10%
+- Tax: 2%
+- Lucro: 20%
+- Operacional: 35%
+- COGS: 30%
+
+Então o sistema deve lançar:
+- Reserva: +30
+- Pro-labore: +100
+- Tax: +20
+- Lucro: +200
+- Operacional: +350
+- COGS: +300
+
+IMPORTANTE:
+- A distribuição deve acontecer apenas sobre a NOVA ENTRADA.
+- O sistema NÃO pode redistribuir valores antigos.
+- O sistema NÃO pode recalcular percentuais sobre o saldo total acumulado.
+- O sistema NÃO pode alterar retroativamente distribuições anteriores, exceto se a entrada original for editada ou excluída.
+
+3. LANÇAMENTO DE SAÍDAS
+Cada saída deve reduzir SOMENTE a conta correta escolhida no lançamento.
+Exemplo:
+Se lançar uma saída de €100 na conta “Operacional”, então:
+- Operacional: saldo atual -100
+- Ecossistema Total: -100
+- As outras contas não devem ser alteradas
+
+O sistema NÃO deve redistribuir novamente as porcentagens por causa de uma saída.
+
+4. FONTE DA VERDADE
+Preciso que exista uma única fonte de verdade para os cálculos.
+Sugestão:
+- Todas as entradas e saídas devem ser armazenadas como transações
+- Os saldos das contas devem ser derivados dessas transações
+- O dashboard deve recalcular com base nas transações reais
+- Evitar salvar saldo manual duplicado em múltiplos lugares, pois isso gera inconsistência
+
+5. LÓGICA CORRETA POR CONTA
+Saldo de cada conta =
+(soma das distribuições de entradas destinadas à conta)
+- (soma das saídas lançadas naquela conta)
+
+6. VALIDAÇÕES NECESSÁRIAS
+Adicionar verificações para garantir:
+- soma dos percentuais = 100%
+- Ecossistema Total = soma dos saldos das contas
+- total distribuído das entradas = valor total das entradas
+- total de saídas baixado nas contas = total de saídas geral
+- impedir saldo negativo se essa for a regra definida
+- mostrar alerta se houver divergência entre dashboard e contas
+
+7. O QUE PRECISO QUE VOCÊ FAÇA
+Quero que você:
+1. revise toda a lógica de cálculo das entradas, saídas e distribuição
+2. identifique onde está a duplicidade ou recálculo incorreto
+3. corrija o algoritmo para seguir as regras acima
+4. refatore para que o saldo do ecossistema e das contas seja calculado de forma consistente
+5. crie uma função única e confiável para:
+   - distribuir entrada
+   - calcular saldo por conta
+   - calcular ecossistema total
+6. adicione logs temporários para debug mostrando:
+   - valor da entrada recebida
+   - distribuição por conta
+   - saída lançada
+   - saldo final por conta
+   - saldo final do ecossistema
+
+8. TESTE QUE DEVE PASSAR
+Exemplo de teste:
+Percentuais:
+- Reserva 3%
+- Pro-labore 10%
+- Tax 2%
+- Lucro 20%
+- Operacional 35%
+- COGS 30%
+
+Entradas:
+- €11.390,85
+
+Saídas totais:
+- €7.270,85
+
+Resultado esperado:
+- Ecossistema Total = €4.120,00
+
+Além disso, a soma dos saldos de todas as contas deve ser exatamente €4.120,00 após baixar corretamente as saídas nas contas correspondentes.
+
+9. IMPORTANTE
+Não quero ajuste apenas visual.
+Quero corrigir a lógica real no backend / state management / database para que:
+- dashboard
+- cards das contas
+- histórico
+- relatórios
+
+todos mostrem exatamente os mesmos números.
+
+Depois de corrigir, me mostre:
+1. qual era a causa do erro
+2. quais arquivos foram alterados
+3. qual a nova lógica implementada
+4. um resumo validando os cálculos com o exemplo acima

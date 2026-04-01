@@ -110,7 +110,7 @@ export default function Dashboard() {
       return diff >= 0 && diff < n && t <= msEnd;
     }).map(c => ({
       ...c,
-      status: c.startDate < todayStr ? 'atrasado' : 'soon',
+      status: ((c as any).dueDate ?? c.startDate) < todayStr ? 'atrasado' : 'soon',
       accountName: accounts?.find((a: any) => a.id === c.accountId)?.name || 'Conta'
     }));
   }, [commitments, accounts, currentPeriod]);
@@ -308,7 +308,11 @@ export default function Dashboard() {
                           </span>
                         </div>
                         <div className="flex justify-between items-center text-[10px]">
-                          <span className="text-muted-foreground font-medium">{alert.accountName}</span>
+                          <span className="text-muted-foreground font-medium">
+                            {(alert as any).dueDate
+                              ? `Vence: ${new Date((alert as any).dueDate).toLocaleDateString("pt-BR")} · ${alert.accountName}`
+                              : alert.accountName}
+                          </span>
                           <span className="font-bold text-foreground">{formatValue(getMonthlyValue(alert, currentMonthIndex, currentYear))}</span>
                         </div>
                       </div>
@@ -586,7 +590,11 @@ export default function Dashboard() {
                         {alert.description}
                         {alert.recurrence === "SEMANAL" ? " (semanal)" : ""}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{alert.accountName}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {(alert as any).dueDate
+                          ? `Vence: ${new Date((alert as any).dueDate).toLocaleDateString("pt-BR")} · ${alert.accountName}`
+                          : alert.accountName}
+                      </p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-bold text-sm text-foreground">{formatValue(getMonthlyValue(alert, currentMonthIndex, currentYear))}</p>

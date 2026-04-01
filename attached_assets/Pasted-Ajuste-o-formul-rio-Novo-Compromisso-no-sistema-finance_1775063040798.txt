@@ -1,0 +1,61 @@
+Ajuste o formulário “Novo Compromisso” no sistema financeiro para suportar melhor o controle de compras e contas a pagar.
+
+Objetivo:
+Adicionar separação clara entre a data em que o compromisso foi adquirido e a data em que ele vence.
+
+Alterações necessárias no formulário:
+1. Renomear o campo “Data de Início” para “Data de Aquisição”.
+   - Esse campo representa a data em que a despesa, compra ou compromisso foi gerado.
+   - Deve continuar aceitando data normal no mesmo padrão atual.
+
+2. Adicionar um novo campo chamado “Data de Vencimento”.
+   - Esse campo deve ficar visível no formulário de criação de compromisso.
+   - Deve aceitar data manual ou por seletor de calendário, no mesmo padrão visual do campo de data existente.
+   - Para compromissos de saída, esse campo deve ser obrigatório.
+   - Para entradas, pode ser opcional, se fizer sentido na lógica atual do sistema.
+
+3. Manter compatibilidade com a lógica já existente de recorrência:
+   - Mensal
+   - Semanal
+   - Parcelado
+
+Regras desejadas:
+- “Data de Aquisição” = quando o gasto ou obrigação foi gerado.
+- “Data de Vencimento” = quando ele deve ser pago.
+- O sistema não deve substituir uma pela outra.
+- Ambas devem ser armazenadas separadamente no banco de dados.
+
+Banco de dados / estrutura:
+- Verificar o model/schema atual de compromissos.
+- Adicionar o novo campo `dueDate` (ou equivalente coerente com o padrão já usado no projeto).
+- O campo atual de data deve ser ajustado para representar `acquisitionDate` (ou equivalente).
+- Atualizar create, edit, save e load do compromisso.
+- Garantir retrocompatibilidade com registros antigos, evitando quebrar dados já existentes.
+
+Interface:
+- Manter o layout limpo e consistente com o design atual.
+- O novo campo deve seguir o mesmo estilo visual dos outros inputs.
+- Se necessário, reorganizar o grid para acomodar:
+  - Descrição
+  - Valor
+  - Data de Aquisição
+  - Data de Vencimento
+  - Categoria
+  - Recorrência
+  - Conta de Débito
+
+Validações:
+- Impedir salvar compromisso de saída sem Data de Vencimento.
+- Permitir que Data de Vencimento seja igual ou posterior à Data de Aquisição.
+- Se a Data de Vencimento for anterior à Data de Aquisição, exibir mensagem amigável de validação.
+
+Extras desejáveis:
+- Preparar a estrutura para futuramente ter também:
+  - Status: Pendente / Pago / Atrasado
+  - Data de Pagamento
+- Não implementar isso agora, apenas deixar o código organizado para suportar isso depois.
+
+Ao final:
+- Mostrar exatamente quais arquivos foram alterados.
+- Explicar resumidamente a lógica implementada.
+- Informar se foi necessário criar migration, alterar schema ou ajustar componentes.

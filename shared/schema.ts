@@ -48,12 +48,16 @@ export const commitments = pgTable("commitments", {
   description: text("description").notNull(),
   value: integer("value").notNull(),
   startDate: text("start_date").notNull(),
+  dueDate: text("due_date"),
   recurrence: text("recurrence").notNull(),
   installments: integer("installments"),
   category: text("category").notNull(),
   commitmentType: text("commitment_type").notNull().default("expense"),
   paidPeriods: text("paid_periods").array().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Future fields (structure only — not implemented yet):
+  // status: text("status").default("pendente"),      // "pendente" | "pago" | "atrasado"
+  // paymentDate: text("payment_date"),               // data em que foi efetivamente pago
 });
 
 export const transactionAllocations = pgTable("transaction_allocations", {

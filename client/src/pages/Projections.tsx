@@ -146,6 +146,8 @@ export default function Projections() {
   const [description, setDescription] = useState("");
   const [valueStr, setValueStr] = useState("");
   const [startDate, setStartDate] = useState<string>(ymd(now));
+  const [dueDate, setDueDate] = useState<string>("");
+  const [dueDateError, setDueDateError] = useState<string>("");
   const [recurrence, setRecurrence] = useState<Recurrence>("FIXO");
   const [installmentsStr, setInstallmentsStr] = useState<string>("1");
   const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
@@ -218,6 +220,8 @@ export default function Projections() {
     setDescription("");
     setValueStr("");
     setStartDate(ymd(now));
+    setDueDate("");
+    setDueDateError("");
     setRecurrence("FIXO");
     setInstallmentsStr("1");
     setCategory(type === "income" ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
@@ -231,6 +235,8 @@ export default function Projections() {
     setDescription(c.description);
     setValueStr(String((c.value / 100).toFixed(2)).replace(".", ","));
     setStartDate(c.startDate);
+    setDueDate((c as any).dueDate ?? "");
+    setDueDateError("");
     setRecurrence(c.recurrence as Recurrence);
     setInstallmentsStr(String(c.installments ?? 1));
     setCategory(c.category);
@@ -244,6 +250,17 @@ export default function Projections() {
   function save() {
     if (!description.trim()) return;
     if (commitmentType === "expense" && !accountId) return;
+
+    setDueDateError("");
+    if (commitmentType === "expense" && !dueDate) {
+      setDueDateError("Data de Vencimento é obrigatória para compromissos de saída.");
+      return;
+    }
+    if (dueDate && startDate && dueDate < startDate) {
+      setDueDateError("A Data de Vencimento não pode ser anterior à Data de Aquisição.");
+      return;
+    }
+
     const valueCents = moneyToCents(valueStr);
     const basePayload = {
       userId: user?.id ?? 0,
@@ -251,15 +268,16 @@ export default function Projections() {
       description: description.trim(),
       value: valueCents,
       startDate,
+      dueDate: dueDate || null,
       recurrence,
       installments: recurrence === "PARCELADO" ? Number(installmentsStr) : null,
       category,
       commitmentType,
     };
     if (editingId) {
-      updateCommitmentMut({ id: editingId, data: basePayload }, { onSuccess: () => setIsModalOpen(false) });
+      updateCommitmentMut({ id: editingId, data: basePayload as any }, { onSuccess: () => setIsModalOpen(false) });
     } else {
-      createCommitment({ ...basePayload, paidPeriods: [] as string[] }, { onSuccess: () => setIsModalOpen(false) });
+      createCommitment({ ...basePayload, paidPeriods: [] as string[] } as any, { onSuccess: () => setIsModalOpen(false) });
     }
   }
 
@@ -416,6 +434,16 @@ export default function Projections() {
                           <span className="bg-primary/5 text-primary px-1.5 py-0.5 rounded-md">
                             {c.recurrence === "FIXO" ? "Mensal" : c.recurrence === "SEMANAL" ? "Semanal" : `${c.installments}x`}
                           </span>
+                          <span className="bg-muted px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                            <Calendar className="w-2.5 h-2.5" />
+                            {new Date(c.startDate).toLocaleDateString("pt-BR")}
+                          </span>
+                          {(c as any).dueDate && (
+                            <span className="bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                              <Calendar className="w-2.5 h-2.5" />
+                              Vence: {new Date((c as any).dueDate).toLocaleDateString("pt-BR")}
+                            </span>
+                          )}
                           {c.recurrence === "SEMANAL" && (
                             <span className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-md">
                               {weeklyOccurrencesInMonth(c.startDate, monthIndex, currentYear)}x no mês = {formatCurrency(monthlyVal)}
@@ -520,6 +548,12 @@ export default function Projections() {
                                   <Calendar className="w-2.5 h-2.5" />
                                   {new Date(c.startDate).toLocaleDateString("pt-BR")}
                                 </span>
+                                {(c as any).dueDate && (
+                                  <span className="bg-destructive/10 text-destructive px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                                    <Calendar className="w-2.5 h-2.5" />
+                                    Vence: {new Date((c as any).dueDate).toLocaleDateString("pt-BR")}
+                                  </span>
+                                )}
                                 {c.recurrence === "SEMANAL" && (
                                   <span className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-md">
                                     {weeklyOccurrencesInMonth(c.startDate, monthIndex, currentYear)}x no mês = {formatCurrency(monthlyVal)}
@@ -590,11 +624,31 @@ export default function Projections() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Data de Início</label>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Data de Aquisição</label>
                   <div className="relative">
-                    <input type="date" className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium appearance-none" value={startDate} onChange={e => setStartDate(e.target.value)} data-testid="input-commitment-date" />
+                    <input type="date" className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium appearance-none" value={startDate} onChange={e => { setStartDate(e.target.value); setDueDateError(""); }} data-testid="input-commitment-start-date" />
                     <Calendar className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">
+                    Data de Vencimento
+                    {commitmentType === "expense" && <span className="text-destructive ml-1">*</span>}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      className={`w-full h-14 px-5 rounded-2xl border bg-background outline-none focus:ring-2 transition-all font-medium appearance-none ${dueDateError ? "border-destructive focus:ring-destructive/20 focus:border-destructive" : "border-border focus:ring-primary/20 focus:border-primary"}`}
+                      value={dueDate}
+                      onChange={e => { setDueDate(e.target.value); setDueDateError(""); }}
+                      data-testid="input-commitment-due-date"
+                    />
+                    <Calendar className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                  </div>
+                  {dueDateError && (
+                    <p className="text-xs text-destructive font-medium ml-1" data-testid="text-due-date-error">{dueDateError}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

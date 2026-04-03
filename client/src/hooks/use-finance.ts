@@ -1,8 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { api, buildUrl } from "@shared/routes";
 import type { User, Account, Transaction, Commitment, Debt } from "@shared/schema";
 
-// Custom fetching wrapper to parse and handle Zod schemas explicitly
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
 async function fetchWithZod<T>(
   url: string,
   options: RequestInit,
@@ -33,6 +37,44 @@ async function fetchWithZod<T>(
   }
   return result.data as T;
 }
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: "include" });
+  if (!res.ok) {
+    if (res.status === 401) {
+      window.location.href = "/";
+      throw new Error("Sessão expirada");
+    }
+    if (res.status === 403) {
+      window.location.href = "/planos";
+      throw new Error("Acesso restrito");
+    }
+    let msg = "Erro";
+    try { const d = await res.json(); if (d.message) msg = d.message; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// CENTRAL SYNC — invalidates ALL financial queries at once.
+// Call this after any action that changes financial state.
+// ---------------------------------------------------------------------------
+
+export function useFinancialSync() {
+  const queryClient = useQueryClient();
+  return useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
+    queryClient.invalidateQueries({ queryKey: [api.transactions.list.path] });
+    queryClient.invalidateQueries({ queryKey: ["/api/commitments"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
+    queryClient.invalidateQueries({ queryKey: [api.user.get.path] });
+  }, [queryClient]);
+}
+
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
 
 export function useUser() {
   return useQuery({
@@ -66,8 +108,27 @@ export function useTransactions() {
   });
 }
 
+export function useCommitments() {
+  return useQuery<Commitment[]>({
+    queryKey: ["/api/commitments"],
+    queryFn: () => apiFetch<Commitment[]>("/api/commitments"),
+  });
+}
+
+export function useDebts() {
+  return useQuery<Debt[]>({
+    queryKey: ["/api/debts"],
+    queryFn: () => apiFetch<Debt[]>("/api/debts"),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Account mutations
+// ---------------------------------------------------------------------------
+
 export function useUpdateAccountPercentages() {
   const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: async (data: {
       updates: { id: number; percentage: number }[];
@@ -83,14 +144,21 @@ export function useUpdateAccountPercentages() {
         api.accounts.updatePercentages.responses[200],
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
+    onSuccess: (updatedAccounts) => {
+      // Instantly show the new accounts — no waiting for a refetch round-trip
+      queryClient.setQueryData([api.accounts.list.path], updatedAccounts);
+      // Then sync all queries to ensure full consistency
+      sync();
     },
   });
 }
 
+// ---------------------------------------------------------------------------
+// Transaction mutations
+// ---------------------------------------------------------------------------
+
 export function useCreateTransaction() {
-  const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: async (data: Omit<Transaction, "id" | "date">) => {
       return fetchWithZod<Transaction>(
@@ -103,15 +171,13 @@ export function useCreateTransaction() {
         api.transactions.create.responses[201],
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.transactions.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
-    },
+    onSuccess: () => sync(),
   });
 }
 
 export function useDistributeIncome() {
   const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: async (data: { amount: number; description: string; date?: string }) => {
       return fetchWithZod<{
@@ -127,16 +193,17 @@ export function useDistributeIncome() {
         api.transactions.distributeIncome.responses[200],
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.transactions.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
+    onSuccess: (result) => {
+      // Instantly populate accounts from the response — zero extra round-trip
+      queryClient.setQueryData([api.accounts.list.path], result.updatedAccounts);
+      // Full sync for transactions and all other queries
+      sync();
     },
   });
 }
 
 export function useUpdateTransaction() {
-  const queryClient = useQueryClient();
-
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: async (payload: { id: number; data: Partial<Transaction> }) => {
       const url = buildUrl(api.transactions.update.path, { id: payload.id });
@@ -150,16 +217,12 @@ export function useUpdateTransaction() {
         api.transactions.update.responses[200],
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.transactions.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
-    },
+    onSuccess: () => sync(),
   });
 }
 
 export function useDeleteTransaction() {
-  const queryClient = useQueryClient();
-
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: async (id: number) => {
       const url = buildUrl(api.transactions.delete.path, { id });
@@ -169,40 +232,16 @@ export function useDeleteTransaction() {
         api.transactions.delete.responses[200],
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.transactions.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
-    },
+    onSuccess: () => sync(),
   });
 }
 
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...options, credentials: "include" });
-  if (!res.ok) {
-    if (res.status === 401) {
-      window.location.href = "/";
-      throw new Error("Sessão expirada");
-    }
-    if (res.status === 403) {
-      window.location.href = "/planos";
-      throw new Error("Acesso restrito");
-    }
-    let msg = "Erro";
-    try { const d = await res.json(); if (d.message) msg = d.message; } catch {}
-    throw new Error(msg);
-  }
-  return res.json();
-}
-
-export function useCommitments() {
-  return useQuery<Commitment[]>({
-    queryKey: ["/api/commitments"],
-    queryFn: () => apiFetch<Commitment[]>("/api/commitments"),
-  });
-}
+// ---------------------------------------------------------------------------
+// Commitment mutations
+// ---------------------------------------------------------------------------
 
 export function useCreateCommitment() {
-  const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: (data: Omit<Commitment, "id" | "createdAt">) =>
       apiFetch<Commitment>("/api/commitments", {
@@ -210,14 +249,12 @@ export function useCreateCommitment() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/commitments"] });
-    },
+    onSuccess: () => sync(),
   });
 }
 
 export function useUpdateCommitment() {
-  const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Commitment> }) =>
       apiFetch<Commitment>(`/api/commitments/${id}`, {
@@ -225,32 +262,25 @@ export function useUpdateCommitment() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/commitments"] });
-    },
+    onSuccess: () => sync(),
   });
 }
 
 export function useDeleteCommitment() {
-  const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: (id: number) =>
       apiFetch<{ ok: true }>(`/api/commitments/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/commitments"] });
-    },
+    onSuccess: () => sync(),
   });
 }
 
-export function useDebts() {
-  return useQuery<Debt[]>({
-    queryKey: ["/api/debts"],
-    queryFn: () => apiFetch<Debt[]>("/api/debts"),
-  });
-}
+// ---------------------------------------------------------------------------
+// Debt mutations
+// ---------------------------------------------------------------------------
 
 export function useCreateDebt() {
-  const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: (data: Omit<Debt, "id" | "createdAt">) =>
       apiFetch<Debt>("/api/debts", {
@@ -258,14 +288,12 @@ export function useCreateDebt() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
-    },
+    onSuccess: () => sync(),
   });
 }
 
 export function useUpdateDebt() {
-  const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Debt> }) =>
       apiFetch<Debt>(`/api/debts/${id}`, {
@@ -273,31 +301,28 @@ export function useUpdateDebt() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
-    },
+    onSuccess: () => sync(),
   });
 }
 
 export function useDeleteDebt() {
-  const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: (id: number) =>
       apiFetch<{ ok: true }>(`/api/debts/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
-    },
+    onSuccess: () => sync(),
   });
 }
 
+// ---------------------------------------------------------------------------
+// Balance recalculation (manual trigger from Dashboard)
+// ---------------------------------------------------------------------------
+
 export function useRecalculateBalances() {
-  const queryClient = useQueryClient();
+  const sync = useFinancialSync();
   return useMutation({
     mutationFn: () =>
       apiFetch<Account[]>("/api/accounts/recalculate", { method: "POST" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.transactions.list.path] });
-    },
+    onSuccess: () => sync(),
   });
 }

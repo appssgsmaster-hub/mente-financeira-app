@@ -1,0 +1,208 @@
+Preciso de uma correção estrutural e definitiva no app.
+
+O app ainda está inconsistente.
+O problema NÃO é visual.
+O problema é de lógica, sincronização e fonte única de verdade.
+
+ERRO ATUAL
+Hoje o sistema continua sem recalcular corretamente o todo quando qualquer evento financeiro acontece.
+Os dados não estão interligados como deveriam.
+
+O app precisa ser VIVO.
+Ou seja:
+qualquer alteração em qualquer parte financeira precisa refletir imediatamente em todo o ecossistema.
+
+O QUE ESTÁ ERRADO HOJE
+1. Entradas e saídas não atualizam corretamente a divisão das contas.
+2. O saldo total do ecossistema não bate com a soma das contas.
+3. Alterações nas porcentagens não redistribuem corretamente os valores.
+4. Correções de transações não recalculam tudo.
+5. Exclusão de transações não recompõe os saldos corretamente.
+6. Projeções e compromissos futuros não estão refletindo corretamente em todos os cards.
+7. O card total de projeções está incorreto — hoje existem duas projeções que ultrapassam 3000, mas o card mostra valor inferior.
+8. Alguns componentes parecem estar usando cálculos próprios, estados separados ou valores antigos em cache.
+
+O QUE EU PRECISO
+Quero que o app funcione com atualização global automática e consistente.
+
+Toda vez que acontecer qualquer uma das ações abaixo:
+- criar entrada
+- editar entrada
+- apagar entrada
+- criar saída
+- editar saída
+- apagar saída
+- alterar percentuais das contas
+- criar projeção
+- editar projeção
+- apagar projeção
+- marcar compromisso como pago
+- desfazer pagamento
+- recalcular saldos manualmente
+
+o sistema precisa atualizar IMEDIATAMENTE e de forma centralizada:
+
+1. saldo total do ecossistema
+2. soma total das entradas
+3. soma total das saídas
+4. saldo individual de cada conta
+5. distribuição por percentual
+6. cards das contas
+7. dashboard geral
+8. alertas
+9. compromissos futuros
+10. total de projeções
+11. contas a receber, se depender desses dados
+12. qualquer outro card derivado dessas informações
+
+ARQUITETURA NECESSÁRIA
+Quero que você refatore isso para funcionar com UMA ÚNICA FONTE DE VERDADE.
+
+Não quero lógica espalhada em vários componentes.
+Não quero card calculando valor isolado.
+Não quero valores antigos persistindo no estado local.
+Não quero precisar clicar em botão para o sistema “tentar” se acertar.
+
+Quero uma função central única, por exemplo:
+recalculateEntireFinancialSystem()
+ou equivalente.
+
+Essa função deve ser responsável por recalcular tudo a partir dos dados reais cadastrados:
+- transactions
+- accounts
+- percentages
+- projections
+- commitments
+- paid items
+- receivables
+- any derived financial summaries
+
+REGRAS OBRIGATÓRIAS
+1. Ecossistema Total = totalEntradas - totalSaidas
+2. Soma dos saldos de todas as contas = Ecossistema Total
+3. O total de projeções deve ser a soma real de todas as projeções ativas
+4. O total de compromissos futuros deve bater com a lista detalhada
+5. Nenhum card pode mostrar valor separado da fonte central
+6. Ao editar ou apagar qualquer item, o sistema deve recompor tudo do zero com base nos dados persistidos
+7. Nada pode depender de valor antigo guardado no componente
+8. Se houver cache/localStorage/estado global, tudo precisa ser sincronizado corretamente após qualquer operação
+
+IMPORTANTE
+Quero que a lógica seja baseada em RECÁLCULO GLOBAL e não em pequenos ajustes parciais.
+Ou seja:
+sempre que houver uma mudança, o sistema recalcula o estado financeiro inteiro.
+Isso é o que vai tornar o app confiável.
+
+PROJEÇÕES
+As projeções também precisam entrar nessa arquitetura viva.
+Hoje o total está errado.
+Quero que:
+- o card de projeções some todas as projeções válidas/ativas
+- o detalhamento bata com o total
+- editar/apagar projeção reflita imediatamente no total
+- marcar compromisso como pago retire ou ajuste corretamente o valor futuro
+- o dashboard inteiro reflita essas mudanças sem inconsistência
+
+O QUE VOCÊ DEVE REVISAR
+Revise toda a lógica financeira nas áreas:
+- dashboard
+- cards das contas
+- transações
+- projeções
+- compromissos
+- alerts
+- botão recalcular
+- storage/state management
+
+PROVÁVEL CAUSA
+Muito provavelmente o sistema está com:
+- cálculos duplicados
+- múltiplos estados derivados sem sincronização
+- useEffect incompleto
+- dependências faltando
+- componentes calculando localmente
+- atualização parcial ao invés de rebuild global
+- persistência sem rehidratação correta
+
+O QUE EU QUERO COMO RESULTADO
+Depois da correção, o app deve funcionar assim:
+
+Exemplo:
+- adiciono uma entrada
+-> atualiza saldo total
+-> redistribui nas contas
+-> atualiza dashboard
+-> atualiza percentuais
+-> atualiza cards
+
+- apago uma saída
+-> recompõe os saldos
+-> atualiza total
+-> atualiza contas
+-> atualiza alertas
+-> atualiza tudo sem precisar recarregar
+
+- altero percentuais
+-> redistribui corretamente
+-> mantém consistência com o total do ecossistema
+
+- adiciono/edito/apago projeção
+-> atualiza o card total de projeções
+-> atualiza detalhamento
+-> atualiza compromissos futuros
+
+VALIDAÇÕES OBRIGATÓRIAS
+Quero checagens automáticas de integridade:
+1. soma das contas === ecossistema total
+2. total de projeções === soma da lista de projeções
+3. total de compromissos futuros === soma real dos compromissos ativos
+
+Se houver diferença:
+- logar erro no console para debug
+- não deixar inconsistência silenciosa
+
+TESTES QUE DEVEM PASSAR
+Teste 1:
+criar entrada de 1000
+resultado:
+- ecossistema = 1000
+- soma das contas = 1000
+
+Teste 2:
+criar saída de 200
+resultado:
+- ecossistema = 800
+- soma das contas = 800
+
+Teste 3:
+editar entrada de 1000 para 1500
+resultado:
+- tudo recalculado corretamente
+
+Teste 4:
+apagar saída
+resultado:
+- tudo recomposto corretamente
+
+Teste 5:
+alterar percentuais
+resultado:
+- redistribuição correta
+- total permanece igual
+
+Teste 6:
+criar duas projeções acima de 3000 no total
+resultado:
+- card total de projeções mostra o valor real acima de 3000
+
+Teste 7:
+marcar compromisso como pago
+resultado:
+- reduz projeção futura corretamente
+- atualiza cards relacionados
+- mantém consistência geral
+
+ENTREGA
+Não quero solução paliativa.
+Quero refatoração da lógica para que o app fique realmente reliable, vivo e totalmente interligado.
+Faça a correção de forma estrutural.

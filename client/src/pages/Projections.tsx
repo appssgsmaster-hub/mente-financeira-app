@@ -137,6 +137,7 @@ export default function Projections() {
 
   const now = new Date();
   const [monthIndex, setMonthIndex] = useState<number>(now.getMonth());
+  const [viewYear, setViewYear] = useState<number>(now.getFullYear());
   const [openAccountId, setOpenAccountId] = useState<number | null>(null);
   const [openIncomeSection, setOpenIncomeSection] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -161,20 +162,20 @@ export default function Projections() {
   };
 
   const commitmentsThisMonth = useMemo(() => {
-    const year = now.getFullYear();
-    return items.filter((c) => isActiveInMonth(c, monthIndex, year));
-  }, [items, monthIndex]);
+    return items.filter((c) => isActiveInMonth(c, monthIndex, viewYear));
+  }, [items, monthIndex, viewYear]);
 
   const expenseCommitments = commitmentsThisMonth.filter(c => (c.commitmentType || "expense") === "expense");
   const incomeCommitments = commitmentsThisMonth.filter(c => c.commitmentType === "income");
 
-  const currentYear = now.getFullYear();
+  // Always use viewYear (tracked state) — never hardcode now.getFullYear()
+  const currentYear = viewYear;
   const totalExpenseCommitted = expenseCommitments.reduce((sum, c) => sum + getMonthlyValue(c, monthIndex, currentYear), 0);
-  const totalExpensePaid = expenseCommitments.filter(c => isCommitmentPaid(c, monthIndex)).reduce((sum, c) => sum + getMonthlyValue(c, monthIndex, currentYear), 0);
+  const totalExpensePaid = expenseCommitments.filter(c => isCommitmentPaid(c, monthIndex, currentYear)).reduce((sum, c) => sum + getMonthlyValue(c, monthIndex, currentYear), 0);
   const totalExpenseOpen = totalExpenseCommitted - totalExpensePaid;
 
   const totalIncomeProjected = incomeCommitments.reduce((sum, c) => sum + getMonthlyValue(c, monthIndex, currentYear), 0);
-  const totalIncomeReceived = incomeCommitments.filter(c => isCommitmentPaid(c, monthIndex)).reduce((sum, c) => sum + getMonthlyValue(c, monthIndex, currentYear), 0);
+  const totalIncomeReceived = incomeCommitments.filter(c => isCommitmentPaid(c, monthIndex, currentYear)).reduce((sum, c) => sum + getMonthlyValue(c, monthIndex, currentYear), 0);
   const totalIncomePending = totalIncomeProjected - totalIncomeReceived;
 
   const totalBalance = accounts?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
@@ -377,18 +378,39 @@ export default function Projections() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {MONTHS.map((m, idx) => (
+      {/* Month + year navigation */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
           <button
-            key={m}
-            onClick={() => setMonthIndex(idx)}
-            className={`px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all ${
-              idx === monthIndex ? "bg-primary text-white border-primary shadow-lg" : "bg-background hover:bg-muted border-border text-muted-foreground"
-            }`}
+            onClick={() => setViewYear(y => y - 1)}
+            className="px-3 py-2 rounded-xl border text-sm font-bold border-border text-muted-foreground hover:bg-muted transition-all"
+            data-testid="button-year-prev"
           >
-            {m}
+            ← {viewYear - 1}
           </button>
-        ))}
+          <span className="font-bold text-sm text-foreground px-2" data-testid="text-view-year">{viewYear}</span>
+          <button
+            onClick={() => setViewYear(y => y + 1)}
+            className="px-3 py-2 rounded-xl border text-sm font-bold border-border text-muted-foreground hover:bg-muted transition-all"
+            data-testid="button-year-next"
+          >
+            {viewYear + 1} →
+          </button>
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+          {MONTHS.map((m, idx) => (
+            <button
+              key={m}
+              onClick={() => setMonthIndex(idx)}
+              className={`px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all ${
+                idx === monthIndex ? "bg-primary text-white border-primary shadow-lg" : "bg-background hover:bg-muted border-border text-muted-foreground"
+              }`}
+              data-testid={`button-month-${idx}`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
       </div>
 
       {incomeCommitments.length > 0 && (
@@ -416,7 +438,7 @@ export default function Projections() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {incomeCommitments.map((c) => {
-                  const paid = isCommitmentPaid(c, monthIndex);
+                  const paid = isCommitmentPaid(c, monthIndex, currentYear);
                   const monthlyVal = getMonthlyValue(c, monthIndex, currentYear);
                   return (
                     <div key={c.id} className={`p-4 border rounded-2xl flex justify-between items-center group transition-all ${paid ? "border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-950/20" : "border-secondary/30 bg-secondary/5 hover:border-secondary/50"}`}>
@@ -479,12 +501,19 @@ export default function Projections() {
           <div className="flex items-center gap-4">
             <div className="w-3 h-10 rounded-full bg-destructive" />
             <div>
-              <h4 className="font-display font-bold text-lg">Future Commitments</h4>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Restante a pagar no mês</p>
+              <h4 className="font-display font-bold text-lg">Compromissos Planejados</h4>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
+                Total comprometido · {totalExpensePaid > 0 ? `${formatCurrency(totalExpensePaid)} pago` : "nenhum pago"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="font-display font-bold text-xl text-destructive" data-testid="text-expense-summary-total">{formatCurrency(totalExpenseOpen)}</span>
+            <div className="text-right">
+              <span className="font-display font-bold text-xl text-destructive" data-testid="text-expense-summary-total">{formatCurrency(totalExpenseCommitted)}</span>
+              {totalExpensePaid > 0 && (
+                <p className="text-xs text-muted-foreground">Em aberto: {formatCurrency(totalExpenseOpen)}</p>
+              )}
+            </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </div>
         </div>
@@ -526,7 +555,7 @@ export default function Projections() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {accItems.map((c) => {
-                        const paid = isCommitmentPaid(c, monthIndex);
+                        const paid = isCommitmentPaid(c, monthIndex, currentYear);
                         const monthlyVal = getMonthlyValue(c, monthIndex, currentYear);
                         return (
                           <div key={c.id} className={`p-4 border rounded-2xl flex justify-between items-center group transition-all ${paid ? "border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-950/20" : "border-border/60 bg-muted/5 hover:border-primary/30"}`}>

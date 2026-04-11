@@ -56,21 +56,37 @@ async function computeDerivedBalances(userId: number, userAccounts: Account[]): 
     allocsByTxId.get(txId)!.set(Number(row.account_id), Number(row.amount));
   }
 
+  // Collect income transactions that have no allocations — backfill them now
+  const missingAllocs: { transactionId: number; accountId: number; amount: number }[] = [];
+  const incomeTxs = userTxs.filter(t => t.type === 'income');
+  for (const tx of incomeTxs) {
+    if (!allocsByTxId.has(tx.id)) {
+      const shares = distributeWithLargestRemainder(tx.amount, userAccounts);
+      for (const s of shares) {
+        if (!allocsByTxId.has(tx.id)) allocsByTxId.set(tx.id, new Map());
+        allocsByTxId.get(tx.id)!.set(s.id, s.share);
+        missingAllocs.push({ transactionId: tx.id, accountId: s.id, amount: s.share });
+      }
+    }
+  }
+  // Persist missing allocations in the background (fire-and-forget, non-blocking)
+  if (missingAllocs.length > 0) {
+    console.log(`[computeDerivedBalances] backfilling ${missingAllocs.length} alocações em falta para userId=${userId}`);
+    db.insert(transactionAllocations).values(missingAllocs).catch(err =>
+      console.error('[computeDerivedBalances] erro ao persistir alocações:', err)
+    );
+  }
+
   const balanceMap = new Map<number, number>(userAccounts.map(a => [a.id, 0]));
 
   for (const tx of userTxs) {
     if (tx.type === 'income') {
       const allocations = allocsByTxId.get(tx.id);
-      if (allocations && allocations.size > 0) {
+      if (allocations) {
         for (const [accountId, amount] of allocations) {
           if (balanceMap.has(accountId)) {
             balanceMap.set(accountId, (balanceMap.get(accountId) || 0) + amount);
           }
-        }
-      } else {
-        const shares = distributeWithLargestRemainder(tx.amount, userAccounts);
-        for (const s of shares) {
-          balanceMap.set(s.id, (balanceMap.get(s.id) || 0) + s.share);
         }
       }
     } else if (tx.type === 'expense' && tx.accountId) {
@@ -80,7 +96,19 @@ async function computeDerivedBalances(userId: number, userAccounts: Account[]): 
     }
   }
 
-  return userAccounts.map(a => ({ ...a, balance: balanceMap.get(a.id) ?? 0 }));
+  const result = userAccounts.map(a => ({ ...a, balance: balanceMap.get(a.id) ?? 0 }));
+
+  // Consistency audit: sum(balances) must equal totalIncome - totalExpense
+  const ecosystemTotal = result.reduce((s, a) => s + a.balance, 0);
+  const totalIncome = incomeTxs.reduce((s, t) => s + t.amount, 0);
+  const totalExpense = userTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const expected = totalIncome - totalExpense;
+  const diff = ecosystemTotal - expected;
+  if (Math.abs(diff) > 0) {
+    console.error(`[AUDIT] INCONSISTÊNCIA DETECTADA userId=${userId}: soma_contas=${ecosystemTotal} esperado=${expected} diferença=${diff}`);
+  }
+
+  return result;
 }
 
 export interface IStorage {
@@ -224,6 +252,18 @@ export class DatabaseStorage implements IStorage {
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
     const [newTx] = await db.insert(transactions).values(transaction).returning();
+    // Auto-create allocations for income transactions so balances are always consistent
+    if (newTx.type === 'income') {
+      const rawAccounts = await db.select().from(accounts).where(eq(accounts.userId, newTx.userId));
+      if (rawAccounts.length > 0) {
+        const shares = distributeWithLargestRemainder(newTx.amount, rawAccounts);
+        if (shares.length > 0) {
+          await db.insert(transactionAllocations).values(
+            shares.map(s => ({ transactionId: newTx.id, accountId: s.id, amount: s.share }))
+          );
+        }
+      }
+    }
     return newTx;
   }
 

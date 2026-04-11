@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAccounts, useTransactions, useUser, useCommitments, useDebts, useRecalculateBalances } from "@/hooks/use-finance";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/format";
@@ -55,18 +55,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { mutate: recalculate, isPending: isRecalculating } = useRecalculateBalances();
 
-  const totalBalance =
-    accounts?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
-
-  const chartData =
-    accounts
-      ?.filter((acc) => acc.percentage > 0)
-      .map((acc) => ({
-        name: acc.name,
-        value: acc.percentage,
-        color: acc.color || "#4F46E5",
-      })) || [];
-
+  // ─── Single source of truth: all monetary totals come from the transactions query ───
   const totalIncome =
     transactions
       ?.filter((t) => t.type === "income")
@@ -76,6 +65,33 @@ export default function Dashboard() {
     transactions
       ?.filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0) || 0;
+
+  // Ecosystem total derived directly from transactions — same source as Entradas/Saídas labels.
+  // This eliminates any race-condition between two separate queries being refreshed at different times.
+  const totalBalance = totalIncome - totalExpense;
+
+  // Individual account balances come from the accounts query (server-computed via computeDerivedBalances).
+  // These must always equal totalBalance. Log a warning if they ever diverge.
+  const accountsSum = accounts?.reduce((sum, acc) => sum + acc.balance, 0) ?? null;
+
+  useEffect(() => {
+    if (accountsSum === null || !transactions) return;
+    const diff = Math.abs(accountsSum - totalBalance);
+    if (diff > 0) {
+      console.error(
+        `[AUDIT FRONTEND] Inconsistência detectada: soma_contas=${accountsSum} ecossistema=${totalBalance} diferença=${diff}`
+      );
+    }
+  }, [accountsSum, totalBalance, transactions]);
+
+  const chartData =
+    accounts
+      ?.filter((acc) => acc.percentage > 0)
+      .map((acc) => ({
+        name: acc.name,
+        value: acc.percentage,
+        color: acc.color || "#4F46E5",
+      })) || [];
 
   const [commitmentsOpen, setCommitmentsOpen] = useState(true);
   const [debtsOpen, setDebtsOpen] = useState(true);
@@ -140,16 +156,6 @@ export default function Dashboard() {
   const totalIncomeReceivable = incomeAlerts.reduce((sum: number, c: any) => sum + getMonthlyValue(c, currentMonthIndex, currentYear), 0);
 
   const totalExpenseRemaining = expenseAlerts.reduce((sum: number, c: any) => sum + getMonthlyValue(c, currentMonthIndex, currentYear), 0);
-
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  
-  const monthlyIncome = transactions
-    ?.filter((t) => t.type === "income" && new Date(t.date).getTime() >= startOfMonth)
-    .reduce((sum, t) => sum + t.amount, 0) || 0;
-
-  const monthlyExpense = transactions
-    ?.filter((t) => t.type === "expense" && new Date(t.date).getTime() >= startOfMonth)
-    .reduce((sum, t) => sum + t.amount, 0) || 0;
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -273,14 +279,14 @@ export default function Dashboard() {
                     <ArrowUpRight className="w-3 h-3 text-secondary" />
                   </div>
                   <span className="text-muted-foreground">Entradas:</span>
-                  <span className="font-bold text-secondary">{formatValue(monthlyIncome)}</span>
+                  <span className="font-bold text-secondary" data-testid="text-total-income">{formatValue(totalIncome)}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs">
                   <div className="w-5 h-5 rounded-full bg-destructive/10 flex items-center justify-center">
                     <ArrowDownRight className="w-3 h-3 text-destructive" />
                   </div>
                   <span className="text-muted-foreground">Saídas:</span>
-                  <span className="font-bold text-destructive">{formatValue(monthlyExpense)}</span>
+                  <span className="font-bold text-destructive" data-testid="text-total-expense">{formatValue(totalExpense)}</span>
                 </div>
               </div>
             </div>
@@ -680,6 +686,74 @@ export default function Dashboard() {
           </div>
         )}
       </Card>
+
+      {/* AUDITORIA FINANCEIRA — validação de consistência */}
+      {(() => {
+        const diff = accountsSum !== null ? Math.abs(accountsSum - totalBalance) : 0;
+        return (
+          <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-audit">
+            <details>
+              <summary className="p-4 sm:p-5 flex items-center gap-3 cursor-pointer list-none">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${diff > 0 ? 'bg-destructive/10' : 'bg-secondary/10'}`}>
+                  <AlertCircle className={`w-4 h-4 ${diff > 0 ? 'text-destructive' : 'text-secondary'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-sm text-foreground">Auditoria Financeira</h4>
+                  <p className={`text-xs mt-0.5 ${diff > 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                    {diff > 0
+                      ? `⚠ Inconsistência de ${formatValue(diff)} detectada`
+                      : '✓ Sistema consistente — todos os valores conferem'}
+                  </p>
+                </div>
+                <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0" />
+              </summary>
+              <div className="px-4 sm:px-5 pb-4 sm:pb-5" data-testid="content-audit-expanded">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">Total de Entradas</span>
+                    <span className="font-bold text-secondary" data-testid="audit-total-income">{formatValue(totalIncome)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">Total de Saídas</span>
+                    <span className="font-bold text-destructive" data-testid="audit-total-expense">{formatValue(totalExpense)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">Ecossistema Calculado</span>
+                    <span className="font-bold text-foreground" data-testid="audit-ecosystem">{formatValue(totalBalance)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">Soma das Contas</span>
+                    <span className="font-bold text-foreground" data-testid="audit-accounts-sum">{formatValue(accountsSum ?? 0)}</span>
+                  </div>
+                  <div className={`flex justify-between items-center py-2 rounded-lg px-3 ${diff > 0 ? 'bg-destructive/5' : 'bg-secondary/5'}`}>
+                    <span className={`font-semibold ${diff > 0 ? 'text-destructive' : 'text-secondary'}`}>Diferença</span>
+                    <span className={`font-bold ${diff > 0 ? 'text-destructive' : 'text-secondary'}`} data-testid="audit-diff">
+                      {diff > 0 ? formatValue(diff) : '✓ Zero'}
+                    </span>
+                  </div>
+                  {diff > 0 && (
+                    <div className="pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full rounded-xl text-xs border-destructive/30 text-destructive hover:bg-destructive/5"
+                        onClick={() => recalculate(undefined, {
+                          onSuccess: () => toast({ title: "Saldos recalculados", description: "Inconsistência corrigida automaticamente." }),
+                        })}
+                        disabled={isRecalculating}
+                        data-testid="button-audit-recalculate"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRecalculating ? 'animate-spin' : ''}`} />
+                        Corrigir Inconsistência Agora
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </details>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

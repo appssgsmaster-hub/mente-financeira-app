@@ -250,6 +250,9 @@ export default function Payments() {
     return [...(transactions || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions]);
 
+  const incomeList = useMemo(() => list.filter((tx) => tx.type === "income"), [list]);
+  const expenseList = useMemo(() => list.filter((tx) => tx.type === "expense"), [list]);
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
       <div className="flex justify-between items-center">
@@ -368,69 +371,137 @@ export default function Payments() {
         </Card>
       </div>
 
-      <Card className="rounded-3xl border border-border p-0 overflow-hidden" data-testid="card-transaction-history">
-        <button
-          className="w-full p-5 sm:p-6 flex items-center justify-between text-left bg-muted/20 border-b border-border"
-          onClick={() => setHistoryOpen(!historyOpen)}
-          data-testid="button-toggle-history"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Receipt className="w-5 h-5 text-primary" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6" data-testid="card-transaction-history">
+
+        {/* Histórico de Entradas */}
+        <Card className="rounded-3xl border border-secondary/30 p-0 overflow-hidden flex flex-col" data-testid="card-income-history">
+          <button
+            className="w-full p-5 flex items-center justify-between text-left bg-secondary/5 border-b border-secondary/20"
+            onClick={() => setHistoryOpen(!historyOpen)}
+            data-testid="button-toggle-history"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+                <ArrowUpRight className="w-5 h-5 text-secondary" />
+              </div>
+              <div>
+                <h2 className="font-bold text-lg text-foreground">Histórico de Entradas</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {incomeList.length > 0
+                    ? `${incomeList.length} ${incomeList.length === 1 ? "entrada registrada" : "entradas registradas"}`
+                    : "Nenhuma entrada encontrada"}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="font-bold text-lg sm:text-xl text-foreground">Histórico de Transações</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {list.length > 0
-                  ? `${list.length} ${list.length === 1 ? "transação registrada" : "transações registradas"}`
-                  : "Nenhuma transação encontrada"}
-              </p>
-            </div>
-          </div>
-          <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${historyOpen ? "rotate-180" : ""}`} />
-        </button>
-        {historyOpen && (
-          <div className="divide-y divide-border" data-testid="content-history-expanded">
-            {list.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">Nenhuma transação encontrada.</div>
-            ) : (
-              list.map((tx) => {
-                const isIncome = tx.type === "income";
-                const accountName = tx.accountId != null ? accountsById.get(tx.accountId)?.name : "Ecossistema (Distribuído)";
-                return (
-                  <div key={tx.id} className="p-3 sm:p-6 flex items-center justify-between hover:bg-muted/30 transition-colors gap-2 sm:gap-4">
-                    <div className="flex items-center gap-2 sm:gap-5 min-w-0 flex-1">
-                      <div className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl shrink-0 ${isIncome ? "bg-secondary/10 text-secondary" : "bg-destructive/10 text-destructive"}`}>
-                        {isIncome ? <ArrowUpRight className="w-4 h-4 sm:w-6 sm:h-6" /> : <Receipt className="w-4 h-4 sm:w-6 sm:h-6" />}
+            <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${historyOpen ? "rotate-180" : ""}`} />
+          </button>
+          {historyOpen && (
+            <div className="divide-y divide-border overflow-y-auto max-h-[500px]" data-testid="content-income-history">
+              {incomeList.length === 0 ? (
+                <div className="p-10 text-center text-muted-foreground text-sm">Nenhuma entrada registrada.</div>
+              ) : (
+                incomeList.map((tx) => {
+                  const accountName = tx.accountId != null ? accountsById.get(tx.accountId)?.name : "Ecossistema (Distribuído)";
+                  return (
+                    <div key={tx.id} className="p-3 sm:p-5 flex items-center justify-between hover:bg-muted/30 transition-colors gap-2 sm:gap-4" data-testid={`row-income-${tx.id}`}>
+                      <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                        <div className="p-2.5 rounded-xl shrink-0 bg-secondary/10 text-secondary">
+                          <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-foreground text-sm sm:text-base truncate">{tx.description}</p>
+                          <div className="flex flex-col gap-0.5 mt-0.5">
+                            <p className="text-xs text-muted-foreground">{format(new Date(tx.date), "dd/MM/yyyy", { locale: ptBR })}</p>
+                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider truncate">{accountName}</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-foreground text-sm sm:text-lg truncate">{tx.description}</p>
-                        <div className="flex flex-col gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
-                          <p className="text-xs sm:text-sm text-muted-foreground">{format(new Date(tx.date), "dd/MM/yyyy", { locale: ptBR })}</p>
-                          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">{accountName}</p>
+                      <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+                        <p className="text-sm sm:text-lg font-bold whitespace-nowrap text-secondary">
+                          + {formatCurrency(tx.amount, user?.currency)}
+                        </p>
+                        <div className="flex items-center">
+                          <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-9 sm:w-9" onClick={() => openEdit(tx)} data-testid={`button-edit-income-${tx.id}`}>
+                            <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-9 sm:w-9 hover:text-destructive" onClick={() => handleDelete(tx.id)} disabled={isDeleting} data-testid={`button-delete-income-${tx.id}`}>
+                            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </Button>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-6 shrink-0">
-                      <p className={`text-sm sm:text-xl font-bold whitespace-nowrap ${isIncome ? "text-secondary" : "text-destructive"}`}>
-                        {isIncome ? "+" : "-"} {formatCurrency(tx.amount, user?.currency)}
-                      </p>
-                      <div className="flex items-center gap-0 sm:gap-2">
-                        <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-10 sm:w-10" onClick={() => openEdit(tx)}>
-                          <Pencil className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-muted-foreground" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-10 sm:w-10 hover:text-destructive" onClick={() => handleDelete(tx.id)} disabled={isDeleting}>
-                          <Trash2 className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
-                        </Button>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* Histórico de Saídas */}
+        <Card className="rounded-3xl border border-destructive/30 p-0 overflow-hidden flex flex-col" data-testid="card-expense-history">
+          <button
+            className="w-full p-5 flex items-center justify-between text-left bg-destructive/5 border-b border-destructive/20"
+            onClick={() => setHistoryOpen(!historyOpen)}
+            data-testid="button-toggle-history-expense"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+                <ArrowDownRight className="w-5 h-5 text-destructive" />
+              </div>
+              <div>
+                <h2 className="font-bold text-lg text-foreground">Histórico de Saídas</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {expenseList.length > 0
+                    ? `${expenseList.length} ${expenseList.length === 1 ? "saída registrada" : "saídas registradas"}`
+                    : "Nenhuma saída encontrada"}
+                </p>
+              </div>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${historyOpen ? "rotate-180" : ""}`} />
+          </button>
+          {historyOpen && (
+            <div className="divide-y divide-border overflow-y-auto max-h-[500px]" data-testid="content-expense-history">
+              {expenseList.length === 0 ? (
+                <div className="p-10 text-center text-muted-foreground text-sm">Nenhuma saída registrada.</div>
+              ) : (
+                expenseList.map((tx) => {
+                  const accountName = tx.accountId != null ? accountsById.get(tx.accountId)?.name : "Ecossistema (Distribuído)";
+                  return (
+                    <div key={tx.id} className="p-3 sm:p-5 flex items-center justify-between hover:bg-muted/30 transition-colors gap-2 sm:gap-4" data-testid={`row-expense-${tx.id}`}>
+                      <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                        <div className="p-2.5 rounded-xl shrink-0 bg-destructive/10 text-destructive">
+                          <Receipt className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-foreground text-sm sm:text-base truncate">{tx.description}</p>
+                          <div className="flex flex-col gap-0.5 mt-0.5">
+                            <p className="text-xs text-muted-foreground">{format(new Date(tx.date), "dd/MM/yyyy", { locale: ptBR })}</p>
+                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider truncate">{accountName}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+                        <p className="text-sm sm:text-lg font-bold whitespace-nowrap text-destructive">
+                          - {formatCurrency(tx.amount, user?.currency)}
+                        </p>
+                        <div className="flex items-center">
+                          <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-9 sm:w-9" onClick={() => openEdit(tx)} data-testid={`button-edit-expense-${tx.id}`}>
+                            <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="rounded-xl h-7 w-7 sm:h-9 sm:w-9 hover:text-destructive" onClick={() => handleDelete(tx.id)} disabled={isDeleting} data-testid={`button-delete-expense-${tx.id}`}>
+                            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
-      </Card>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </Card>
+
+      </div>
 
       {editingId && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">

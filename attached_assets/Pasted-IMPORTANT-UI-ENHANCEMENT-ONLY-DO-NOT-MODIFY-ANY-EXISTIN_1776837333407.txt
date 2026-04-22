@@ -1,0 +1,71 @@
+IMPORTANT: UI ENHANCEMENT ONLY — DO NOT MODIFY ANY EXISTING LOGIC, CALCULATIONS, DATABASE STRUCTURE, OR TRANSACTION BEHAVIOR.
+
+GOAL:
+Enhance each account card (“Suas Contas”) to display its own related expense history using existing transaction data, without changing any logic.
+
+CONTEXT:
+Each expense transaction is already associated with a specific account (e.g., CMV, Operacional, Fixos, etc.).
+We must reuse this existing relationship.
+
+TASK:
+Inside EACH account card, add a collapsible (dropdown) section that shows the list of EXPENSES (saídas) made from that specific account.
+
+BEHAVIOR:
+
+1) Add a toggle/expand button inside each account card
+- Could be an arrow icon or “Ver detalhes”
+- Default state: CLOSED (collapsed)
+
+2) When expanded:
+- Show a list of expense transactions WHERE:
+  transaction.type = expense
+  AND transaction.account = current card account
+
+3) DATA SOURCE (CRITICAL):
+- USE ONLY existing transaction history
+- DO NOT create new data structures
+- DO NOT duplicate transactions
+- DO NOT move or alter existing data
+- Just FILTER the existing transactions
+
+4) DISPLAY INSIDE DROPDOWN:
+For each transaction show:
+- Description (name)
+- Date
+- Amount (keep red / negative style)
+- Optional: category if already available
+
+5) ORDER:
+- Most recent first (descending by date)
+
+6) LIMIT:
+- Show last 5 transactions initially
+- If more exist, show a “Ver mais” or scroll inside the dropdown
+
+7) SUBTOTAL (OPTIONAL BUT RECOMMENDED):
+- Show: “Total gasto nesta conta” (sum of displayed expenses or all expenses for that account)
+
+8) UI RULES:
+- Must match existing card design (colors, spacing, typography)
+- Dropdown must feel like part of the card (not a separate component)
+- Smooth expand/collapse (no page jump)
+- Keep it clean and minimal
+
+9) RESPONSIVENESS:
+- Desktop: cards remain as they are (grid layout)
+- Mobile: cards stacked, dropdown still works inside each
+
+10) REACTIVITY (CRITICAL):
+- When a new expense is created → it must automatically appear in the correct account card
+- When editing an expense and changing its account → it must move to the correct card
+- When deleting → it must disappear from that account
+- No page reload required
+
+STRICT RULES:
+- DO NOT change how balances are calculated
+- DO NOT change percentage distribution logic
+- DO NOT change transaction creation/edit/delete
+- DO NOT interfere with other screens (Histórico, Projeções, etc.)
+
+GOAL:
+Allow the user to understand, directly inside each account card, where the money is being spent, using existing data only.

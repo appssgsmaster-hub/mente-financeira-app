@@ -54,6 +54,37 @@ export default function Dashboard() {
   const planTier = (user as any)?.planTier || "free";
   const { toast } = useToast();
   const { mutate: recalculate, isPending: isRecalculating } = useRecalculateBalances();
+  const [openAccountExpenses, setOpenAccountExpenses] = useState<Set<number>>(new Set());
+  const [showAllExpenses, setShowAllExpenses] = useState<Set<number>>(new Set());
+
+  function toggleAccountExpenses(id: number) {
+    setOpenAccountExpenses(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleShowAllExpenses(id: number) {
+    setShowAllExpenses(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  const expensesByAccount = useMemo(() => {
+    const map = new Map<number, typeof transactions extends undefined ? never[] : NonNullable<typeof transactions>>();
+    (transactions || [])
+      .filter(t => t.type === "expense" && t.accountId != null)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .forEach(t => {
+        const key = t.accountId!;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(t);
+      });
+    return map;
+  }, [transactions]);
 
   // ─── Single source of truth: all monetary totals come from the transactions query ───
   const totalIncome =
@@ -504,57 +535,124 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {accounts?.map((account) => (
-            <Card
-              key={account.id}
-              className="p-6 rounded-2xl border-border/50 relative overflow-hidden group"
-            >
-              <div
-                className="absolute top-0 left-0 w-full h-1.5 transition-all duration-300"
-                style={{ backgroundColor: account.color || "var(--primary)" }}
-              />
+          {accounts?.map((account) => {
+            const accTxs = expensesByAccount.get(account.id) || [];
+            const isExpanded = openAccountExpenses.has(account.id);
+            const showAll = showAllExpenses.has(account.id);
+            const displayed = showAll ? accTxs : accTxs.slice(0, 5);
+            const totalSpent = accTxs.reduce((s, t) => s + t.amount, 0);
 
-              <div className="flex items-start justify-between mb-4 sm:mb-6 mt-2">
-                <div className="min-w-0 flex-1">
-                  <h4 className="font-medium text-foreground text-sm sm:text-lg mb-1 truncate">
-                    {account.name}
-                  </h4>
-                  <div className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
-                    Meta: {account.percentage}%
+            return (
+              <Card
+                key={account.id}
+                className="rounded-2xl border-border/50 relative overflow-hidden group"
+                data-testid={`card-account-${account.id}`}
+              >
+                <div
+                  className="absolute top-0 left-0 w-full h-1.5 transition-all duration-300"
+                  style={{ backgroundColor: account.color || "var(--primary)" }}
+                />
+
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4 sm:mb-6 mt-2">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-medium text-foreground text-sm sm:text-lg mb-1 truncate">
+                        {account.name}
+                      </h4>
+                      <div className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                        Meta: {account.percentage}%
+                      </div>
+                    </div>
+
+                    <div
+                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ml-2"
+                      style={{
+                        backgroundColor: `${account.color || "#4F46E5"}20`,
+                        color: account.color || "#4F46E5",
+                      }}
+                    >
+                      <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">
+                      Saldo Atual
+                    </p>
+                    <p className="text-xl sm:text-3xl font-display font-bold text-foreground">
+                      {formatValue(account.balance)}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 w-full bg-muted h-2 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.min(100, Math.max(5, account.percentage))}%`,
+                        backgroundColor: account.color || "#4F46E5",
+                      }}
+                    />
                   </div>
                 </div>
 
-                <div
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ml-2"
-                  style={{
-                    backgroundColor: `${account.color || "#4F46E5"}20`,
-                    color: account.color || "#4F46E5",
-                  }}
+                {/* Toggle button */}
+                <button
+                  className="w-full px-6 py-3 flex items-center justify-between border-t border-border/50 text-xs font-semibold text-muted-foreground hover:bg-muted/30 transition-colors"
+                  onClick={() => toggleAccountExpenses(account.id)}
+                  data-testid={`button-toggle-account-expenses-${account.id}`}
                 >
-                  <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-              </div>
+                  <span>
+                    {accTxs.length > 0
+                      ? `${accTxs.length} saída${accTxs.length !== 1 ? "s" : ""} · Total: ${formatValue(totalSpent)}`
+                      : "Nenhuma saída nesta conta"}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                    style={{ color: account.color || "var(--primary)" }}
+                  />
+                </button>
 
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-1">
-                  Saldo Atual
-                </p>
-                <p className="text-xl sm:text-3xl font-display font-bold text-foreground">
-                  {formatValue(account.balance)}
-                </p>
-              </div>
-
-              <div className="mt-6 w-full bg-muted h-2 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.min(100, Math.max(5, account.percentage))}%`,
-                    backgroundColor: account.color || "#4F46E5",
-                  }}
-                />
-              </div>
-            </Card>
-          ))}
+                {/* Collapsible expense list */}
+                {isExpanded && (
+                  <div className="border-t border-border/30" data-testid={`content-account-expenses-${account.id}`}>
+                    {accTxs.length === 0 ? (
+                      <p className="px-6 py-4 text-xs text-muted-foreground italic">Nenhuma saída registrada para esta conta.</p>
+                    ) : (
+                      <>
+                        <div className="divide-y divide-border/30">
+                          {displayed.map((tx) => (
+                            <div key={tx.id} className="px-6 py-3 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors" data-testid={`row-account-expense-${tx.id}`}>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-foreground truncate">{tx.description}</p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  {new Date(tx.date).toLocaleDateString("pt-BR")}
+                                </p>
+                              </div>
+                              <p className="text-sm font-bold text-destructive whitespace-nowrap shrink-0">
+                                - {formatValue(tx.amount)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        {accTxs.length > 5 && (
+                          <div className="px-6 py-3 border-t border-border/30">
+                            <button
+                              className="text-xs font-semibold hover:underline transition-colors"
+                              style={{ color: account.color || "var(--primary)" }}
+                              onClick={() => toggleShowAllExpenses(account.id)}
+                              data-testid={`button-show-all-expenses-${account.id}`}
+                            >
+                              {showAll ? "Ver menos" : `Ver mais ${accTxs.length - 5} transações`}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       </div>
 

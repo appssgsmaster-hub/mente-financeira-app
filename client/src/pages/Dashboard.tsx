@@ -97,36 +97,26 @@ export default function Dashboard() {
     return map;
   }, [transactions, viewMonth, viewYear]);
 
-  // ─── All-time totals (for audit check only — never used in display) ───
-  const allTimeIncome =
+  // ─── All-time totals: these are the ONLY source of truth for displayed balances ───
+  // Month navigation NEVER changes these values — it only filters commitments/alerts/history.
+  const totalIncome =
     transactions?.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0) || 0;
-  const allTimeExpense =
+  const totalExpense =
     transactions?.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0) || 0;
-  const allTimeBalance = allTimeIncome - allTimeExpense;
-
-  // ─── Month-filtered totals (drive all displayed numbers) ───
-  const totalIncome = useMemo(
-    () => transactions?.filter((t) => t.type === "income" && isInViewMonth(t.date, viewMonth, viewYear)).reduce((sum, t) => sum + t.amount, 0) || 0,
-    [transactions, viewMonth, viewYear]
-  );
-  const totalExpense = useMemo(
-    () => transactions?.filter((t) => t.type === "expense" && isInViewMonth(t.date, viewMonth, viewYear)).reduce((sum, t) => sum + t.amount, 0) || 0,
-    [transactions, viewMonth, viewYear]
-  );
   const totalBalance = totalIncome - totalExpense;
 
-  // ─── Audit: all-time account sums must match all-time transaction balance ───
+  // ─── Audit: account balances (server-computed) must match all-time transaction balance ───
   const accountsSum = accounts?.reduce((sum, acc) => sum + acc.balance, 0) ?? null;
 
   useEffect(() => {
     if (accountsSum === null || !transactions) return;
-    const diff = Math.abs(accountsSum - allTimeBalance);
+    const diff = Math.abs(accountsSum - totalBalance);
     if (diff > 0) {
       console.error(
-        `[AUDIT FRONTEND] Inconsistência detectada: soma_contas=${accountsSum} ecossistema=${allTimeBalance} diferença=${diff}`
+        `[AUDIT FRONTEND] Inconsistência detectada: soma_contas=${accountsSum} ecossistema=${totalBalance} diferença=${diff}`
       );
     }
-  }, [accountsSum, allTimeBalance, transactions]);
+  }, [accountsSum, totalBalance, transactions]);
 
   const chartData =
     accounts
@@ -290,8 +280,11 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
-      {/* MONTH + YEAR NAVIGATION */}
+      {/* MONTH + YEAR NAVIGATION — controls commitments/alerts/account history only */}
       <div className="space-y-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+          Mês de referência · Compromissos &amp; Histórico
+        </p>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setViewYear(y => y - 1)}
@@ -339,9 +332,6 @@ export default function Dashboard() {
                 </div>
                 <p className="text-xs sm:text-sm uppercase tracking-wider text-muted-foreground font-semibold">
                   Ecossistema Total
-                  <span className="ml-2 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold normal-case tracking-normal" data-testid="text-view-period">
-                    {MONTHS[viewMonth]} {viewYear}
-                  </span>
                 </p>
               </div>
 
@@ -381,7 +371,7 @@ export default function Dashboard() {
               {expenseAlerts.length > 0 ? (
                 <div className="w-full bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 space-y-3 min-h-[100px]">
                   <div className="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest">
-                    <AlertCircle className="w-4 h-4 shrink-0" /> Alertas do Ecossistema
+                    <AlertCircle className="w-4 h-4 shrink-0" /> Alertas · {MONTHS[viewMonth]} {viewYear}
                   </div>
                   <div className="space-y-3 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
                     {expenseAlerts.slice(0, 3).map((alert, i) => (
@@ -719,10 +709,15 @@ export default function Dashboard() {
               <Clock className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h4 className="font-bold text-sm text-foreground">Upcoming Commitments</h4>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-sm text-foreground">Compromissos a Pagar</h4>
+                <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold" data-testid="text-commitments-period">
+                  {MONTHS[viewMonth]} {viewYear}
+                </span>
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {expenseAlerts.length > 0
-                  ? `Total a pagar este mês: ${formatValue(totalExpenseRemaining)}`
+                  ? `Total a pagar: ${formatValue(totalExpenseRemaining)}`
                   : "Nenhum compromisso pendente"}
               </p>
             </div>

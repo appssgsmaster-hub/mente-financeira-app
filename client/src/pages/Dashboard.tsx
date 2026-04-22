@@ -28,6 +28,14 @@ import {
   Tooltip as RechartsTooltip,
 } from "recharts";
 
+const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function isInViewMonth(dateStr: string, month: number, year: number) {
+  // Timezone-safe: parse date string directly without Date constructor
+  const parts = dateStr.split("T")[0].split("-").map(Number);
+  return parts[1] - 1 === month && parts[0] === year;
+}
+
 function weeklyOccurrencesInMonth(startDateStr: string, monthIndex: number, year: number) {
   const startDate = new Date(startDateStr);
   const monthStart = new Date(year, monthIndex, 1);
@@ -54,8 +62,11 @@ export default function Dashboard() {
   const planTier = (user as any)?.planTier || "free";
   const { toast } = useToast();
   const { mutate: recalculate, isPending: isRecalculating } = useRecalculateBalances();
+  const now = new Date();
   const [openAccountExpenses, setOpenAccountExpenses] = useState<Set<number>>(new Set());
   const [showAllExpenses, setShowAllExpenses] = useState<Set<number>>(new Set());
+  const [viewMonth, setViewMonth] = useState<number>(now.getMonth());
+  const [viewYear, setViewYear] = useState<number>(now.getFullYear());
 
   function toggleAccountExpenses(id: number) {
     setOpenAccountExpenses(prev => {
@@ -76,7 +87,7 @@ export default function Dashboard() {
   const expensesByAccount = useMemo(() => {
     const map = new Map<number, typeof transactions extends undefined ? never[] : NonNullable<typeof transactions>>();
     (transactions || [])
-      .filter(t => t.type === "expense" && t.accountId != null)
+      .filter(t => t.type === "expense" && t.accountId != null && isInViewMonth(t.date, viewMonth, viewYear))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .forEach(t => {
         const key = t.accountId!;
@@ -84,36 +95,38 @@ export default function Dashboard() {
         map.get(key)!.push(t);
       });
     return map;
-  }, [transactions]);
+  }, [transactions, viewMonth, viewYear]);
 
-  // ─── Single source of truth: all monetary totals come from the transactions query ───
-  const totalIncome =
-    transactions
-      ?.filter((t) => t.type === "income")
-      .reduce((sum, t) => sum + t.amount, 0) || 0;
+  // ─── All-time totals (for audit check only — never used in display) ───
+  const allTimeIncome =
+    transactions?.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0) || 0;
+  const allTimeExpense =
+    transactions?.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0) || 0;
+  const allTimeBalance = allTimeIncome - allTimeExpense;
 
-  const totalExpense =
-    transactions
-      ?.filter((t) => t.type === "expense")
-      .reduce((sum, t) => sum + t.amount, 0) || 0;
-
-  // Ecosystem total derived directly from transactions — same source as Entradas/Saídas labels.
-  // This eliminates any race-condition between two separate queries being refreshed at different times.
+  // ─── Month-filtered totals (drive all displayed numbers) ───
+  const totalIncome = useMemo(
+    () => transactions?.filter((t) => t.type === "income" && isInViewMonth(t.date, viewMonth, viewYear)).reduce((sum, t) => sum + t.amount, 0) || 0,
+    [transactions, viewMonth, viewYear]
+  );
+  const totalExpense = useMemo(
+    () => transactions?.filter((t) => t.type === "expense" && isInViewMonth(t.date, viewMonth, viewYear)).reduce((sum, t) => sum + t.amount, 0) || 0,
+    [transactions, viewMonth, viewYear]
+  );
   const totalBalance = totalIncome - totalExpense;
 
-  // Individual account balances come from the accounts query (server-computed via computeDerivedBalances).
-  // These must always equal totalBalance. Log a warning if they ever diverge.
+  // ─── Audit: all-time account sums must match all-time transaction balance ───
   const accountsSum = accounts?.reduce((sum, acc) => sum + acc.balance, 0) ?? null;
 
   useEffect(() => {
     if (accountsSum === null || !transactions) return;
-    const diff = Math.abs(accountsSum - totalBalance);
+    const diff = Math.abs(accountsSum - allTimeBalance);
     if (diff > 0) {
       console.error(
-        `[AUDIT FRONTEND] Inconsistência detectada: soma_contas=${accountsSum} ecossistema=${totalBalance} diferença=${diff}`
+        `[AUDIT FRONTEND] Inconsistência detectada: soma_contas=${accountsSum} ecossistema=${allTimeBalance} diferença=${diff}`
       );
     }
-  }, [accountsSum, totalBalance, transactions]);
+  }, [accountsSum, allTimeBalance, transactions]);
 
   const chartData =
     accounts
@@ -133,14 +146,12 @@ export default function Dashboard() {
   const activeDebts = debtsData.filter((d) => !d.paid);
   const totalDebt = activeDebts.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
-  const now = new Date();
-  const currentMonthIndex = now.getMonth();
-  const currentYear = now.getFullYear();
-  const currentPeriod = `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}`;
+  // currentPeriod always tracks the selected view month/year for paid-period checks
+  const currentPeriod = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
 
   const expenseAlerts = useMemo(() => {
     const todayStr = now.toISOString().split('T')[0];
-    const msEnd = new Date(currentYear, currentMonthIndex + 1, 0).getTime();
+    const msEnd = new Date(viewYear, viewMonth + 1, 0).getTime();
 
     return commitments.filter(c => {
       if ((c.commitmentType || "expense") !== "expense") return false;
@@ -153,17 +164,17 @@ export default function Dashboard() {
         return t <= msEnd;
       }
       const n = Math.max(1, Number(c.installments ?? 1));
-      const diff = (currentYear - d.getFullYear()) * 12 + (currentMonthIndex - d.getMonth());
+      const diff = (viewYear - d.getFullYear()) * 12 + (viewMonth - d.getMonth());
       return diff >= 0 && diff < n && t <= msEnd;
     }).map(c => ({
       ...c,
       status: ((c as any).dueDate ?? c.startDate) < todayStr ? 'atrasado' : 'soon',
       accountName: accounts?.find((a: any) => a.id === c.accountId)?.name || 'Conta'
     }));
-  }, [commitments, accounts, currentPeriod]);
+  }, [commitments, accounts, currentPeriod, viewMonth, viewYear]);
 
   const incomeAlerts = useMemo(() => {
-    const msEnd = new Date(currentYear, currentMonthIndex + 1, 0).getTime();
+    const msEnd = new Date(viewYear, viewMonth + 1, 0).getTime();
 
     return commitments.filter(c => {
       if (c.commitmentType !== "income") return false;
@@ -176,17 +187,17 @@ export default function Dashboard() {
         return t <= msEnd;
       }
       const n = Math.max(1, Number(c.installments ?? 1));
-      const diff = (currentYear - d.getFullYear()) * 12 + (currentMonthIndex - d.getMonth());
+      const diff = (viewYear - d.getFullYear()) * 12 + (viewMonth - d.getMonth());
       return diff >= 0 && diff < n && t <= msEnd;
     }).map(c => ({
       ...c,
       accountName: accounts?.find((a: any) => a.id === c.accountId)?.name || 'Conta'
     }));
-  }, [commitments, accounts, currentPeriod]);
+  }, [commitments, accounts, currentPeriod, viewMonth, viewYear]);
 
-  const totalIncomeReceivable = incomeAlerts.reduce((sum: number, c: any) => sum + getMonthlyValue(c, currentMonthIndex, currentYear), 0);
+  const totalIncomeReceivable = incomeAlerts.reduce((sum: number, c: any) => sum + getMonthlyValue(c, viewMonth, viewYear), 0);
 
-  const totalExpenseRemaining = expenseAlerts.reduce((sum: number, c: any) => sum + getMonthlyValue(c, currentMonthIndex, currentYear), 0);
+  const totalExpenseRemaining = expenseAlerts.reduce((sum: number, c: any) => sum + getMonthlyValue(c, viewMonth, viewYear), 0);
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -279,6 +290,43 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+      {/* MONTH + YEAR NAVIGATION */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setViewYear(y => y - 1)}
+            className="px-3 py-1.5 rounded-xl border text-xs font-bold border-border text-muted-foreground hover:bg-muted transition-all"
+            data-testid="button-year-prev"
+          >
+            ← {viewYear - 1}
+          </button>
+          <span className="font-bold text-sm text-foreground px-1" data-testid="text-view-year">{viewYear}</span>
+          <button
+            onClick={() => setViewYear(y => y + 1)}
+            className="px-3 py-1.5 rounded-xl border text-xs font-bold border-border text-muted-foreground hover:bg-muted transition-all"
+            data-testid="button-year-next"
+          >
+            {viewYear + 1} →
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {MONTHS.map((m, idx) => (
+            <button
+              key={m}
+              onClick={() => setViewMonth(idx)}
+              className={`px-4 py-1.5 rounded-2xl border text-xs font-bold transition-all whitespace-nowrap ${
+                idx === viewMonth
+                  ? "bg-primary text-white border-primary shadow"
+                  : "bg-background hover:bg-muted border-border text-muted-foreground"
+              }`}
+              data-testid={`button-month-${idx}`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* 1 — ECOSSISTEMA TOTAL + DONUT ROW */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-5 sm:p-8 rounded-2xl sm:rounded-3xl shadow-xl border border-primary/10 bg-gradient-to-br from-primary/[0.03] via-white to-secondary/[0.04] dark:from-primary/[0.06] dark:via-card dark:to-secondary/[0.06] overflow-hidden relative">
@@ -291,6 +339,9 @@ export default function Dashboard() {
                 </div>
                 <p className="text-xs sm:text-sm uppercase tracking-wider text-muted-foreground font-semibold">
                   Ecossistema Total
+                  <span className="ml-2 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold normal-case tracking-normal" data-testid="text-view-period">
+                    {MONTHS[viewMonth]} {viewYear}
+                  </span>
                 </p>
               </div>
 
@@ -350,7 +401,7 @@ export default function Dashboard() {
                               ? `Vence: ${new Date((alert as any).dueDate).toLocaleDateString("pt-BR")} · ${alert.accountName}`
                               : alert.accountName}
                           </span>
-                          <span className="font-bold text-foreground">{formatValue(getMonthlyValue(alert, currentMonthIndex, currentYear))}</span>
+                          <span className="font-bold text-foreground">{formatValue(getMonthlyValue(alert, viewMonth, viewYear))}</span>
                         </div>
                       </div>
                     ))}
@@ -461,7 +512,7 @@ export default function Dashboard() {
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="font-bold text-sm text-secondary">{formatValue(getMonthlyValue(item, currentMonthIndex, currentYear))}</p>
+                          <p className="font-bold text-sm text-secondary">{formatValue(getMonthlyValue(item, viewMonth, viewYear))}</p>
                           <span className="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] mt-0.5 bg-secondary/10 text-secondary">A receber</span>
                         </div>
                       </div>
@@ -701,7 +752,7 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-bold text-sm text-foreground">{formatValue(getMonthlyValue(alert, currentMonthIndex, currentYear))}</p>
+                      <p className="font-bold text-sm text-foreground">{formatValue(getMonthlyValue(alert, viewMonth, viewYear))}</p>
                       <span className={`inline-block px-2 py-0.5 rounded-full font-bold text-[10px] mt-0.5 ${alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
                         {alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
                       </span>

@@ -60,22 +60,6 @@ async function buildAll() {
     logLevel: "info",
   });
 
-  console.log("building Vercel API handler...");
-  // Output as .cjs so Node.js treats the file as CommonJS regardless of
-  // the project-level "type": "module" in package.json.  Without .cjs the
-  // runtime parses the file as ESM, where `module` is undefined, and the
-  // entire exports object ends up as an empty null-prototype namespace.
-  await esbuild({
-    entryPoints: ["server/vercelHandler.ts"],
-    platform: "node",
-    bundle: true,
-    format: "cjs",
-    outfile: "api/index.cjs",
-    // Keep all npm packages external — Vercel installs node_modules itself.
-    // Only local TypeScript files are bundled into the output.
-    packages: "external",
-    logLevel: "info",
-  });
 }
 
 buildAll().catch((err) => {

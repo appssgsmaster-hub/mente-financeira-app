@@ -287,7 +287,7 @@ export async function registerRoutes(
 
   app.patch("/api/accounts/:id", requireActiveSubscription, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const updated = await storage.updateAccountForUser(req.session.userId!, id, req.body);
       res.json(updated);
     } catch (err) {
@@ -297,7 +297,7 @@ export async function registerRoutes(
 
   app.delete("/api/accounts/:id", requireActiveSubscription, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       await storage.deleteAccountForUser(req.session.userId!, id);
       res.json({ ok: true });
     } catch (err) {
@@ -358,7 +358,7 @@ export async function registerRoutes(
 
   app.patch(api.transactions.update.path, requireActiveSubscription, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const updated = await storage.updateTransactionForUser(req.session.userId!, id, req.body);
       res.json(updated);
     } catch (err) {
@@ -368,7 +368,7 @@ export async function registerRoutes(
 
   app.delete(api.transactions.delete.path, requireActiveSubscription, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       await storage.deleteTransactionForUser(req.session.userId!, id);
       res.json({ ok: true });
     } catch (err) {
@@ -405,7 +405,7 @@ export async function registerRoutes(
 
   app.patch("/api/commitments/:id", requireActiveSubscription, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const updated = await storage.updateCommitment(req.session.userId!, id, req.body);
       res.json(updated);
     } catch (err) {
@@ -415,7 +415,7 @@ export async function registerRoutes(
 
   app.delete("/api/commitments/:id", requireActiveSubscription, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       await storage.deleteCommitment(req.session.userId!, id);
       res.json({ ok: true });
     } catch (err) {
@@ -443,7 +443,7 @@ export async function registerRoutes(
 
   app.patch("/api/debts/:id", requireActiveSubscription, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const updated = await storage.updateDebt(req.session.userId!, id, req.body);
       res.json(updated);
     } catch (err) {
@@ -453,7 +453,7 @@ export async function registerRoutes(
 
   app.delete("/api/debts/:id", requireActiveSubscription, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       await storage.deleteDebt(req.session.userId!, id);
       res.json({ ok: true });
     } catch (err) {

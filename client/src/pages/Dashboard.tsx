@@ -87,7 +87,7 @@ export default function Dashboard() {
   const expensesByAccount = useMemo(() => {
     const map = new Map<number, typeof transactions extends undefined ? never[] : NonNullable<typeof transactions>>();
     (transactions || [])
-      .filter(t => t.type === "expense" && t.accountId != null && isInViewMonth(t.date, viewMonth, viewYear))
+      .filter(t => t.type === "expense" && t.accountId != null && isInViewMonth(String(t.date), viewMonth, viewYear))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .forEach(t => {
         const key = t.accountId!;

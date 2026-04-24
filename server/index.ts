@@ -117,7 +117,7 @@ async function initStripe() {
   try {
     const { runMigrations } = await import('stripe-replit-sync');
     console.log('[stripe] Initializing schema...');
-    await runMigrations({ databaseUrl, schema: 'stripe' });
+    await runMigrations({ databaseUrl, schema: 'stripe' } as any);
     console.log('[stripe] Schema ready');
 
     const { getStripeSync } = await import('./stripeClient');

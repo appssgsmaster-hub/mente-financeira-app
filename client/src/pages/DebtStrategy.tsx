@@ -171,6 +171,7 @@ export default function DebtStrategy() {
       description: `Pagamento Dívida: ${d.creditor}`,
       value: installmentCents,
       startDate: new Date().toISOString().split("T")[0],
+      dueDate: null,
       recurrence: months > 1 ? "PARCELADO" : "FIXO",
       installments: months > 1 ? months : null,
       category: "Compromissos Financeiros",

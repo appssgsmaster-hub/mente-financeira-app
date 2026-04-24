@@ -3,7 +3,19 @@ import Stripe from 'stripe';
 let connectionSettings: any;
 
 async function getCredentials() {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  // Outside Replit (e.g. Vercel): use standard env vars directly
+  if (!process.env.REPLIT_CONNECTORS_HOSTNAME) {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+    if (!secretKey || !publishableKey) {
+      throw new Error(
+        'STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY must be set when running outside of Replit'
+      );
+    }
+    return { secretKey, publishableKey };
+  }
+
+  // Replit connector path
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY
     : process.env.WEB_REPL_RENEWAL
@@ -14,6 +26,7 @@ async function getCredentials() {
     throw new Error('X-Replit-Token not found for repl/depl');
   }
 
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const connectorName = 'stripe';
   const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
   const environments = isProduction ? ['production', 'development'] : ['development'];

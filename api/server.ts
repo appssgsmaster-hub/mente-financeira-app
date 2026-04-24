@@ -44,7 +44,7 @@ app.use(
       conString: process.env.DATABASE_URL,
       createTableIfMissing: true,
     }),
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.SESSION_SECRET || "fallback-secret-change-me",
     resave: false,
     saveUninitialized: false,
     proxy: true,
@@ -77,6 +77,14 @@ function ensureInitialized(): Promise<void> {
 }
 
 export default async function handler(req: any, res: any) {
-  await ensureInitialized();
+  try {
+    await ensureInitialized();
+  } catch (err: any) {
+    console.error("[api/server] Initialization failed:", err.message);
+    // Reset so next request retries initialization
+    initPromise = null;
+    res.status(500).json({ message: "Server initialization failed: " + err.message });
+    return;
+  }
   return app(req, res);
 }

@@ -36,6 +36,7 @@ module.exports = __toCommonJS(vercelHandler_exports);
 var import_express = __toESM(require("express"), 1);
 var import_express_session = __toESM(require("express-session"), 1);
 var import_connect_pg_simple = __toESM(require("connect-pg-simple"), 1);
+var import_pg2 = __toESM(require("pg"), 1);
 var import_http = require("http");
 
 // server/db.ts
@@ -156,7 +157,16 @@ var connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   console.error("[db] WARNING: DATABASE_URL is not set \u2014 database queries will fail");
 }
-var pool = new Pool({ connectionString });
+var pool = new Pool({
+  connectionString,
+  connectionTimeoutMillis: 5e3,
+  idleTimeoutMillis: 1e4,
+  max: 5,
+  ssl: connectionString && !connectionString.includes("localhost") ? { rejectUnauthorized: false } : void 0
+});
+pool.on("error", (err) => {
+  console.error("[db] pool error:", err.message);
+});
 var db = (0, import_node_postgres.drizzle)(pool, { schema: schema_exports });
 
 // server/storage.ts
@@ -1485,6 +1495,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // server/vercelHandler.ts
+var { Pool: Pool2 } = import_pg2.default;
 var PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
 var app = (0, import_express.default)();
 app.post(
@@ -1516,12 +1527,34 @@ app.use(
   })
 );
 app.use(import_express.default.urlencoded({ extended: false }));
+var dbPool = process.env.DATABASE_URL ? new Pool2({
+  connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 5e3,
+  idleTimeoutMillis: 1e4,
+  max: 3,
+  ssl: process.env.DATABASE_URL.includes("localhost") ? void 0 : { rejectUnauthorized: false }
+}) : null;
+if (dbPool) {
+  dbPool.on("error", (err) => {
+    console.error("[vercel] pg pool error:", err.message);
+  });
+}
+var sessionStore;
+if (dbPool) {
+  const pgStore = new PgStore({ pool: dbPool, createTableIfMissing: true });
+  pgStore.on?.("error", (err) => {
+    console.error("[vercel] session store error:", err.message);
+  });
+  sessionStore = pgStore;
+} else {
+  console.warn(
+    "[vercel] DATABASE_URL not set \u2014 using MemoryStore (sessions will not persist across Lambda restarts)"
+  );
+  sessionStore = new import_express_session.default.MemoryStore();
+}
 app.use(
   (0, import_express_session.default)({
-    store: new PgStore({
-      conString: process.env.DATABASE_URL,
-      createTableIfMissing: true
-    }),
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || "fallback-secret-change-me",
     resave: false,
     saveUninitialized: false,

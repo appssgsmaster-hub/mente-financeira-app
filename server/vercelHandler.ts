@@ -1,10 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import pkg from "pg";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { WebhookHandlers } from "./webhookHandlers";
 
+const { Pool } = pkg;
 const PgStore = connectPgSimple(session);
 const app = express();
 
@@ -39,12 +41,52 @@ app.use(
 );
 app.use(express.urlencoded({ extended: false }));
 
+// Build a pg Pool with sensible Vercel-compatible defaults.
+// Neon (the DB Replit uses) requires SSL; set rejectUnauthorized: false
+// to accept Neon's managed certificate.
+// connectionTimeoutMillis prevents the Lambda from hanging forever on a
+// bad/missing DATABASE_URL and hitting Vercel's invocation timeout.
+const dbPool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 10000,
+      max: 3,
+      ssl: process.env.DATABASE_URL.includes("localhost")
+        ? undefined
+        : { rejectUnauthorized: false },
+    })
+  : null;
+
+// Prevent unhandled pool errors from crashing the Lambda process.
+if (dbPool) {
+  dbPool.on("error", (err) => {
+    console.error("[vercel] pg pool error:", err.message);
+  });
+}
+
+// Build the session store. If DATABASE_URL is absent fall back to
+// MemoryStore so the Lambda at least starts up and returns meaningful
+// error messages instead of crashing.
+let sessionStore: session.Store;
+if (dbPool) {
+  const pgStore = new PgStore({ pool: dbPool, createTableIfMissing: true });
+  // connect-pg-simple emits errors asynchronously — catch them so Node
+  // doesn't treat them as unhandled rejections (process crash on Node 15+).
+  (pgStore as any).on?.("error", (err: Error) => {
+    console.error("[vercel] session store error:", err.message);
+  });
+  sessionStore = pgStore;
+} else {
+  console.warn(
+    "[vercel] DATABASE_URL not set — using MemoryStore (sessions will not persist across Lambda restarts)"
+  );
+  sessionStore = new session.MemoryStore();
+}
+
 app.use(
   session({
-    store: new PgStore({
-      conString: process.env.DATABASE_URL,
-      createTableIfMissing: true,
-    }),
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || "fallback-secret-change-me",
     resave: false,
     saveUninitialized: false,

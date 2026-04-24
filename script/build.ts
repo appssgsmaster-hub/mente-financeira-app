@@ -60,6 +60,19 @@ async function buildAll() {
     logLevel: "info",
   });
 
+  console.log("building Vercel API handler...");
+  // api/package.json sets "type":"commonjs" so api/index.js is loaded as CJS
+  // regardless of the root package.json "type":"module".
+  // esbuild produces a proper CJS bundle with explicit format:"cjs".
+  await esbuild({
+    entryPoints: ["server/vercelHandler.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "api/index.js",
+    packages: "external",
+    logLevel: "info",
+  });
 }
 
 buildAll().catch((err) => {

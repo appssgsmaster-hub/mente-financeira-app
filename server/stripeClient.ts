@@ -80,6 +80,12 @@ let stripeSync: any = null;
 
 export async function getStripeSync() {
   if (!stripeSync) {
+    if (!process.env.REPLIT_CONNECTORS_HOSTNAME) {
+      throw new Error(
+        'stripe-replit-sync is only available in the Replit environment. ' +
+        'On Vercel, Stripe syncing is not supported.'
+      );
+    }
     const { StripeSync } = await import('stripe-replit-sync');
     const secretKey = await getStripeSecretKey();
 

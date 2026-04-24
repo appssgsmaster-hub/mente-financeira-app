@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { createServer } from "http";
+import { registerRoutes } from "../server/routes";
+import { WebhookHandlers } from "../server/webhookHandlers";
 
 const PgStore = connectPgSimple(session);
 const app = express();
@@ -19,7 +21,6 @@ app.post(
       if (!Buffer.isBuffer(req.body)) {
         return res.status(500).json({ error: "Webhook processing error" });
       }
-      const { WebhookHandlers } = await import("../server/webhookHandlers");
       await WebhookHandlers.processWebhook(req.body as Buffer, sig);
       res.status(200).json({ received: true });
     } catch (error: any) {
@@ -62,7 +63,6 @@ let initPromise: Promise<void> | null = null;
 function ensureInitialized(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
-      const { registerRoutes } = await import("../server/routes");
       const httpServer = createServer(app);
       await registerRoutes(httpServer, app);
       app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -81,7 +81,6 @@ export default async function handler(req: any, res: any) {
     await ensureInitialized();
   } catch (err: any) {
     console.error("[api/server] Initialization failed:", err.message);
-    // Reset so next request retries initialization
     initPromise = null;
     res.status(500).json({ message: "Server initialization failed: " + err.message });
     return;

@@ -59,6 +59,19 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  console.log("building Vercel API handler...");
+  await esbuild({
+    entryPoints: ["server/vercelHandler.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "api/index.js",
+    // Keep all npm packages external — Vercel installs node_modules itself.
+    // Only local TypeScript files are bundled into the output.
+    packages: "external",
+    logLevel: "info",
+  });
 }
 
 buildAll().catch((err) => {

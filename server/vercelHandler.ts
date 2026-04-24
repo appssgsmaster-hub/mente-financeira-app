@@ -2,8 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { createServer } from "http";
-import { registerRoutes } from "../server/routes";
-import { WebhookHandlers } from "../server/webhookHandlers";
+import { registerRoutes } from "./routes";
+import { WebhookHandlers } from "./webhookHandlers";
 
 const PgStore = connectPgSimple(session);
 const app = express();
@@ -80,7 +80,7 @@ export default async function handler(req: any, res: any) {
   try {
     await ensureInitialized();
   } catch (err: any) {
-    console.error("[api/server] Initialization failed:", err.message);
+    console.error("[vercel] Initialization failed:", err.message);
     initPromise = null;
     res.status(500).json({ message: "Server initialization failed: " + err.message });
     return;

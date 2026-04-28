@@ -35,6 +35,13 @@ const allowlist = [
 async function buildAll() {
   await rm("dist", { recursive: true, force: true });
 
+  // Remove any stale Vercel handler files that may survive in Vercel's build
+  // cache from previous deployments (e.g. api/index.ts, api/index.js).
+  // This ensures only api/index.cjs (our controlled CJS bundle) is present.
+  await rm("api/index.ts", { force: true });
+  await rm("api/index.js", { force: true });
+  await rm("api/index.cjs", { force: true });
+
   console.log("building client...");
   await viteBuild();
 
@@ -69,7 +76,7 @@ async function buildAll() {
     platform: "node",
     bundle: true,
     format: "cjs",
-    outfile: "api/index.js",
+    outfile: "api/index.cjs",
     packages: "external",
     logLevel: "info",
   });

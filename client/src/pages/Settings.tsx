@@ -29,6 +29,9 @@ export default function Settings() {
   const [editName, setEditName] = useState("");
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
+  // Tracks raw typed strings for percentage inputs so "24." doesn't snap back
+  const [percentageStrings, setPercentageStrings] = useState<Record<number, string>>({});
+
   useEffect(() => {
     if (user) {
       setSelectedCurrency(user.currency);
@@ -65,6 +68,23 @@ export default function Settings() {
     setLocalValues((prev) =>
       prev.map((v) => (v.id === id ? { ...v, percentage: newValue } : v)),
     );
+  };
+
+  const handlePercentageInput = (id: number, raw: string) => {
+    setPercentageStrings((prev) => ({ ...prev, [id]: raw }));
+    const v = parseFloat(raw);
+    if (!isNaN(v) && v >= 0 && v <= 100) {
+      handleSliderChange(id, Math.round(v * 100) / 100);
+    }
+  };
+
+  const handlePercentageBlur = (id: number) => {
+    const raw = percentageStrings[id] ?? "";
+    const v = parseFloat(raw);
+    const current = localValues.find((x) => x.id === id)?.percentage ?? 0;
+    const resolved = isNaN(v) ? current : Math.min(100, Math.max(0, Math.round(v * 100) / 100));
+    handleSliderChange(id, resolved);
+    setPercentageStrings((prev) => { const next = { ...prev }; delete next[id]; return next; });
   };
 
   const currentTotal = Math.round(localValues.reduce((sum, v) => sum + v.percentage, 0) * 100) / 100;
@@ -237,7 +257,20 @@ export default function Settings() {
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <span className="text-2xl font-display font-bold w-16 text-right">{+(localVal.toFixed(2))}%</span>
+                    <div className="flex items-center w-24">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        value={percentageStrings[account.id] !== undefined ? percentageStrings[account.id] : +(localVal.toFixed(2))}
+                        onChange={(e) => handlePercentageInput(account.id, e.target.value)}
+                        onBlur={() => handlePercentageBlur(account.id)}
+                        data-testid={`input-percentage-${account.id}`}
+                        className="w-16 text-right text-2xl font-display font-bold bg-transparent border-b-2 border-border focus:border-primary outline-none transition-colors"
+                      />
+                      <span className="text-2xl font-display font-bold text-muted-foreground">%</span>
+                    </div>
                     <Button 
                       variant="ghost" 
                       size="icon" 

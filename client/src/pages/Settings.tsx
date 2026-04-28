@@ -67,7 +67,7 @@ export default function Settings() {
     );
   };
 
-  const currentTotal = localValues.reduce((sum, v) => sum + v.percentage, 0);
+  const currentTotal = Math.round(localValues.reduce((sum, v) => sum + v.percentage, 0) * 100) / 100;
   const isValid = currentTotal === 100;
 
   const handleSavePercentages = () => {
@@ -198,7 +198,7 @@ export default function Settings() {
             <p className="text-sm text-muted-foreground mt-1">A soma deve ser exatamente 100%.</p>
           </div>
           <div className="text-4xl font-display font-bold">
-            <span className={isValid ? "text-secondary" : "text-destructive"}>{currentTotal}%</span>
+            <span className={isValid ? "text-secondary" : "text-destructive"}>{+(currentTotal.toFixed(2))}%</span>
           </div>
         </div>
 
@@ -237,7 +237,7 @@ export default function Settings() {
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <span className="text-2xl font-display font-bold w-16 text-right">{localVal}%</span>
+                    <span className="text-2xl font-display font-bold w-16 text-right">{+(localVal.toFixed(2))}%</span>
                     <Button 
                       variant="ghost" 
                       size="icon" 
@@ -253,7 +253,7 @@ export default function Settings() {
                   value={[localVal]}
                   onValueChange={(val) => handleSliderChange(account.id, val[0])}
                   max={100}
-                  step={1}
+                  step={0.01}
                   className="cursor-pointer"
                 />
               </div>

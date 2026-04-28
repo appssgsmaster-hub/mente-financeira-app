@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, real, boolean, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -24,7 +24,7 @@ export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   name: text("name").notNull(),
-  percentage: integer("percentage").notNull(),
+  percentage: real("percentage").notNull(),
   balance: integer("balance").notNull().default(0),
   color: text("color").notNull(),
 });

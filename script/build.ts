@@ -36,8 +36,7 @@ async function buildAll() {
   await rm("dist", { recursive: true, force: true });
 
   // Remove any stale Vercel handler files that may survive in Vercel's build
-  // cache from previous deployments (e.g. api/index.ts, api/index.js).
-  // This ensures only api/index.cjs (our controlled CJS bundle) is present.
+  // cache from previous deployments.
   await rm("api/index.ts", { force: true });
   await rm("api/index.js", { force: true });
   await rm("api/index.cjs", { force: true });
@@ -71,12 +70,13 @@ async function buildAll() {
   // api/package.json sets "type":"commonjs" so api/index.js is loaded as CJS
   // regardless of the root package.json "type":"module".
   // esbuild produces a proper CJS bundle with explicit format:"cjs".
+  // Output as .js (not .cjs) so Vercel's function auto-detection picks it up.
   await esbuild({
     entryPoints: ["server/vercelHandler.ts"],
     platform: "node",
     bundle: true,
     format: "cjs",
-    outfile: "api/index.cjs",
+    outfile: "api/index.js",
     packages: "external",
     logLevel: "info",
   });

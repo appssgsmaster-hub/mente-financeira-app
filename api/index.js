@@ -84,7 +84,7 @@ var accounts = (0, import_pg_core.pgTable)("accounts", {
   id: (0, import_pg_core.serial)("id").primaryKey(),
   userId: (0, import_pg_core.integer)("user_id").notNull(),
   name: (0, import_pg_core.text)("name").notNull(),
-  percentage: (0, import_pg_core.integer)("percentage").notNull(),
+  percentage: (0, import_pg_core.real)("percentage").notNull(),
   balance: (0, import_pg_core.integer)("balance").notNull().default(0),
   color: (0, import_pg_core.text)("color").notNull()
 });

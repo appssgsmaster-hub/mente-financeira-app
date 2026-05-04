@@ -95,6 +95,31 @@ app.use(
   })
 );
 
+// Health check — reveals DB/env status without exposing secret values.
+// Visit /api/health on Vercel to diagnose configuration issues.
+app.get("/api/health", async (_req, res) => {
+  const dbUrl = process.env.DATABASE_URL;
+  const sessionSecret = process.env.SESSION_SECRET;
+  const info: Record<string, unknown> = {
+    DATABASE_URL: dbUrl ? "set" : "MISSING",
+    SESSION_SECRET: sessionSecret ? "set" : "MISSING",
+    NODE_ENV: process.env.NODE_ENV || "not set",
+    dbPoolAvailable: !!dbPool,
+  };
+  if (dbPool) {
+    try {
+      const result = await dbPool.query("SELECT NOW() AS now, current_database() AS db");
+      info.dbConnected = true;
+      info.dbTime = result.rows[0].now;
+      info.dbName = result.rows[0].db;
+    } catch (err: any) {
+      info.dbConnected = false;
+      info.dbError = err.message;
+    }
+  }
+  res.json({ status: "ok", ...info });
+});
+
 let initPromise: Promise<void> | null = null;
 
 function ensureInitialized(): Promise<void> {

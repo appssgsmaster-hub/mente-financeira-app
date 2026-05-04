@@ -7,6 +7,8 @@ import { rm, readFile } from "fs/promises";
 const allowlist = [
   "@google/generative-ai",
   "axios",
+  "bcryptjs",
+  "connect-pg-simple",
   "cors",
   "date-fns",
   "drizzle-orm",
@@ -67,17 +69,30 @@ async function buildAll() {
   });
 
   console.log("building Vercel API handler...");
-  // api/package.json sets "type":"commonjs" so api/index.js is loaded as CJS
-  // regardless of the root package.json "type":"module".
-  // esbuild produces a proper CJS bundle with explicit format:"cjs".
-  // Output as .js (not .cjs) so Vercel's function auto-detection picks it up.
+  // Bundle ALL server-side JS deps into api/index.js so the Vercel serverless
+  // function is self-contained and does not depend on Vercel finding node_modules
+  // at runtime. Only native addons (pg-native) and optional bindings are left
+  // external since they are not needed and cannot be bundled anyway.
   await esbuild({
     entryPoints: ["server/vercelHandler.ts"],
     platform: "node",
     bundle: true,
     format: "cjs",
     outfile: "api/index.js",
-    packages: "external",
+    // Mark only things that cannot/should not be bundled:
+    //  - pg-native: optional native addon, not needed (pure-JS pg works fine)
+    //  - @mapbox/node-pre-gyp: native addon helper pulled in by some packages
+    //  - mock-aws-s3 / aws-sdk / nock: optional test deps inside some packages
+    external: [
+      "pg-native",
+      "@mapbox/node-pre-gyp",
+      "mock-aws-s3",
+      "aws-sdk",
+      "nock",
+    ],
+    define: {
+      "import.meta.url": '"file:///app/api/index.js"',
+    },
     logLevel: "info",
   });
 }

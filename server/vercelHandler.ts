@@ -41,41 +41,44 @@ app.use(
 );
 app.use(express.urlencoded({ extended: false }));
 
-const dbPool = process.env.DATABASE_URL
-  ? new Pool({
-      connectionString: process.env.DATABASE_URL,
+// Parse the DATABASE_URL and build pg connection options that work with Neon.
+// Neon URLs look like: postgresql://user:pass@ep-xxx.neon.tech/db?sslmode=require
+// We strip the sslmode query param and handle SSL ourselves to avoid conflicts.
+function buildPoolConfig(url: string) {
+  try {
+    // Remove sslmode param from URL so pg doesn't get confused by dual SSL config
+    const cleanUrl = url.replace(/[?&]sslmode=[^&]*/g, "").replace(/[?&]ssl=[^&]*/g, "").replace(/\?$/, "");
+    const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
+    return {
+      connectionString: cleanUrl,
       max: 2,
-      connectionTimeoutMillis: 8000,
+      connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 10000,
-      ssl: process.env.DATABASE_URL.includes("localhost")
-        ? undefined
-        : { rejectUnauthorized: false },
-    })
-  : null;
+      ssl: isLocal ? undefined : { rejectUnauthorized: false },
+    };
+  } catch {
+    return { connectionString: url, max: 2, connectionTimeoutMillis: 5000 };
+  }
+}
 
-// Prevent unhandled pool errors from crashing the Lambda process.
+const rawDatabaseUrl = process.env.DATABASE_URL;
+const dbPool = rawDatabaseUrl ? new Pool(buildPoolConfig(rawDatabaseUrl)) : null;
+
 if (dbPool) {
   dbPool.on("error", (err) => {
     console.error("[vercel] pg pool error:", err.message);
   });
 }
 
-// Build the session store. If DATABASE_URL is absent fall back to
-// MemoryStore so the Lambda at least starts up and returns meaningful
-// error messages instead of crashing.
 let sessionStore: session.Store;
 if (dbPool) {
   const pgStore = new PgStore({ pool: dbPool, createTableIfMissing: true });
-  // connect-pg-simple emits errors asynchronously — catch them so Node
-  // doesn't treat them as unhandled rejections (process crash on Node 15+).
   (pgStore as any).on?.("error", (err: Error) => {
     console.error("[vercel] session store error:", err.message);
   });
   sessionStore = pgStore;
 } else {
-  console.warn(
-    "[vercel] DATABASE_URL not set — using MemoryStore (sessions will not persist across Lambda restarts)"
-  );
+  console.warn("[vercel] DATABASE_URL not set — using MemoryStore");
   sessionStore = new session.MemoryStore();
 }
 
@@ -94,31 +97,6 @@ app.use(
     },
   })
 );
-
-// Health check — reveals DB/env status without exposing secret values.
-// Visit /api/health on Vercel to diagnose configuration issues.
-app.get("/api/health", async (_req, res) => {
-  const dbUrl = process.env.DATABASE_URL;
-  const sessionSecret = process.env.SESSION_SECRET;
-  const info: Record<string, unknown> = {
-    DATABASE_URL: dbUrl ? "set" : "MISSING",
-    SESSION_SECRET: sessionSecret ? "set" : "MISSING",
-    NODE_ENV: process.env.NODE_ENV || "not set",
-    dbPoolAvailable: !!dbPool,
-  };
-  if (dbPool) {
-    try {
-      const result = await dbPool.query("SELECT NOW() AS now, current_database() AS db");
-      info.dbConnected = true;
-      info.dbTime = result.rows[0].now;
-      info.dbName = result.rows[0].db;
-    } catch (err: any) {
-      info.dbConnected = false;
-      info.dbError = err.message;
-    }
-  }
-  res.json({ status: "ok", ...info });
-});
 
 let initPromise: Promise<void> | null = null;
 
@@ -139,12 +117,44 @@ function ensureInitialized(): Promise<void> {
 }
 
 export default async function handler(req: any, res: any) {
+  // Health check: respond directly without going through ensureInitialized,
+  // so it always works even if routes fail to register.
+  if (req.url === "/api/health" || req.url?.startsWith("/api/health?")) {
+    const dbUrl = rawDatabaseUrl;
+    const info: Record<string, unknown> = {
+      DATABASE_URL: dbUrl ? `set (${dbUrl.substring(0, 20)}...)` : "MISSING",
+      SESSION_SECRET: process.env.SESSION_SECRET ? "set" : "MISSING",
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? "set" : "MISSING",
+      NODE_ENV: process.env.NODE_ENV || "not set",
+      nodeVersion: process.version,
+      dbPoolAvailable: !!dbPool,
+    };
+    if (dbPool) {
+      try {
+        const result = await dbPool.query("SELECT NOW() AS now, current_database() AS db, version() AS ver");
+        info.dbConnected = true;
+        info.dbTime = result.rows[0].now;
+        info.dbName = result.rows[0].db;
+        info.dbVersion = result.rows[0].ver?.split(" ").slice(0, 2).join(" ");
+      } catch (err: any) {
+        info.dbConnected = false;
+        info.dbError = err.message;
+        info.dbErrorCode = err.code;
+      }
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ status: "ok", ...info }, null, 2));
+    return;
+  }
+
   try {
     await ensureInitialized();
   } catch (err: any) {
-    console.error("[vercel] Initialization failed:", err.message);
+    console.error("[vercel] Initialization failed:", err.message, err.stack);
     initPromise = null;
-    res.status(500).json({ message: "Server initialization failed: " + err.message });
+    res.setHeader("Content-Type", "application/json");
+    res.statusCode = 500;
+    res.end(JSON.stringify({ message: "Server initialization failed", detail: err.message }));
     return;
   }
   return app(req, res);

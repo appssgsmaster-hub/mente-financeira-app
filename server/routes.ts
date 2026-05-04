@@ -88,7 +88,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       }
       console.error("[register] Unexpected error:", err instanceof Error ? `${err.message}\n${err.stack}` : err);
-      res.status(500).json({ message: "Erro ao criar conta" });
+      res.status(500).json({ message: "Erro ao criar conta", detail: err instanceof Error ? err.message : String(err) });
     }
   });
 
@@ -114,7 +114,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       }
       console.error("[login] Unexpected error:", err instanceof Error ? `${err.message}\n${err.stack}` : err);
-      res.status(500).json({ message: "Erro no login" });
+      res.status(500).json({ message: "Erro no login", detail: err instanceof Error ? err.message : String(err) });
     }
   });
 

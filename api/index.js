@@ -68793,7 +68793,7 @@ async function registerRoutes(httpServer, app2) {
       }
       console.error("[register] Unexpected error:", err instanceof Error ? `${err.message}
 ${err.stack}` : err);
-      res.status(500).json({ message: "Erro ao criar conta" });
+      res.status(500).json({ message: "Erro ao criar conta", detail: err instanceof Error ? err.message : String(err) });
     }
   });
   app2.post("/api/auth/login", async (req, res) => {
@@ -68816,7 +68816,7 @@ ${err.stack}` : err);
       }
       console.error("[login] Unexpected error:", err instanceof Error ? `${err.message}
 ${err.stack}` : err);
-      res.status(500).json({ message: "Erro no login" });
+      res.status(500).json({ message: "Erro no login", detail: err instanceof Error ? err.message : String(err) });
     }
   });
   app2.post("/api/auth/logout", (req, res) => {
@@ -69402,13 +69402,23 @@ app.use(
   })
 );
 app.use(import_express.default.urlencoded({ extended: false }));
-var dbPool = process.env.DATABASE_URL ? new Pool4({
-  connectionString: process.env.DATABASE_URL,
-  max: 2,
-  connectionTimeoutMillis: 8e3,
-  idleTimeoutMillis: 1e4,
-  ssl: process.env.DATABASE_URL.includes("localhost") ? void 0 : { rejectUnauthorized: false }
-}) : null;
+function buildPoolConfig(url) {
+  try {
+    const cleanUrl = url.replace(/[?&]sslmode=[^&]*/g, "").replace(/[?&]ssl=[^&]*/g, "").replace(/\?$/, "");
+    const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
+    return {
+      connectionString: cleanUrl,
+      max: 2,
+      connectionTimeoutMillis: 5e3,
+      idleTimeoutMillis: 1e4,
+      ssl: isLocal ? void 0 : { rejectUnauthorized: false }
+    };
+  } catch {
+    return { connectionString: url, max: 2, connectionTimeoutMillis: 5e3 };
+  }
+}
+var rawDatabaseUrl = process.env.DATABASE_URL;
+var dbPool = rawDatabaseUrl ? new Pool4(buildPoolConfig(rawDatabaseUrl)) : null;
 if (dbPool) {
   dbPool.on("error", (err) => {
     console.error("[vercel] pg pool error:", err.message);
@@ -69422,9 +69432,7 @@ if (dbPool) {
   });
   sessionStore = pgStore;
 } else {
-  console.warn(
-    "[vercel] DATABASE_URL not set \u2014 using MemoryStore (sessions will not persist across Lambda restarts)"
-  );
+  console.warn("[vercel] DATABASE_URL not set \u2014 using MemoryStore");
   sessionStore = new import_express_session.default.MemoryStore();
 }
 app.use(
@@ -69442,28 +69450,6 @@ app.use(
     }
   })
 );
-app.get("/api/health", async (_req, res) => {
-  const dbUrl = process.env.DATABASE_URL;
-  const sessionSecret = process.env.SESSION_SECRET;
-  const info = {
-    DATABASE_URL: dbUrl ? "set" : "MISSING",
-    SESSION_SECRET: sessionSecret ? "set" : "MISSING",
-    NODE_ENV: process.env.NODE_ENV || "not set",
-    dbPoolAvailable: !!dbPool
-  };
-  if (dbPool) {
-    try {
-      const result = await dbPool.query("SELECT NOW() AS now, current_database() AS db");
-      info.dbConnected = true;
-      info.dbTime = result.rows[0].now;
-      info.dbName = result.rows[0].db;
-    } catch (err) {
-      info.dbConnected = false;
-      info.dbError = err.message;
-    }
-  }
-  res.json({ status: "ok", ...info });
-});
 var initPromise = null;
 function ensureInitialized() {
   if (!initPromise) {
@@ -69481,12 +69467,41 @@ function ensureInitialized() {
   return initPromise;
 }
 async function handler(req, res) {
+  if (req.url === "/api/health" || req.url?.startsWith("/api/health?")) {
+    const dbUrl = rawDatabaseUrl;
+    const info = {
+      DATABASE_URL: dbUrl ? `set (${dbUrl.substring(0, 20)}...)` : "MISSING",
+      SESSION_SECRET: process.env.SESSION_SECRET ? "set" : "MISSING",
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? "set" : "MISSING",
+      NODE_ENV: process.env.NODE_ENV || "not set",
+      nodeVersion: process.version,
+      dbPoolAvailable: !!dbPool
+    };
+    if (dbPool) {
+      try {
+        const result = await dbPool.query("SELECT NOW() AS now, current_database() AS db, version() AS ver");
+        info.dbConnected = true;
+        info.dbTime = result.rows[0].now;
+        info.dbName = result.rows[0].db;
+        info.dbVersion = result.rows[0].ver?.split(" ").slice(0, 2).join(" ");
+      } catch (err) {
+        info.dbConnected = false;
+        info.dbError = err.message;
+        info.dbErrorCode = err.code;
+      }
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ status: "ok", ...info }, null, 2));
+    return;
+  }
   try {
     await ensureInitialized();
   } catch (err) {
-    console.error("[vercel] Initialization failed:", err.message);
+    console.error("[vercel] Initialization failed:", err.message, err.stack);
     initPromise = null;
-    res.status(500).json({ message: "Server initialization failed: " + err.message });
+    res.setHeader("Content-Type", "application/json");
+    res.statusCode = 500;
+    res.end(JSON.stringify({ message: "Server initialization failed", detail: err.message }));
     return;
   }
   return app(req, res);

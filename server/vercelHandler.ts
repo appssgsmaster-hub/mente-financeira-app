@@ -1,7 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { Pool } from "@neondatabase/serverless";
+import pkg from "pg";
+const { Pool } = pkg;
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -40,10 +41,16 @@ app.use(
 );
 app.use(express.urlencoded({ extended: false }));
 
-// Use @neondatabase/serverless Pool — communicates over WebSockets instead of
-// raw TCP, which eliminates cold-start connection timeouts on Vercel Lambda.
 const dbPool = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL })
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 2,
+      connectionTimeoutMillis: 8000,
+      idleTimeoutMillis: 10000,
+      ssl: process.env.DATABASE_URL.includes("localhost")
+        ? undefined
+        : { rejectUnauthorized: false },
+    })
   : null;
 
 // Prevent unhandled pool errors from crashing the Lambda process.

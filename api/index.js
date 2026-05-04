@@ -36,12 +36,12 @@ module.exports = __toCommonJS(vercelHandler_exports);
 var import_express = __toESM(require("express"), 1);
 var import_express_session = __toESM(require("express-session"), 1);
 var import_connect_pg_simple = __toESM(require("connect-pg-simple"), 1);
-var import_serverless2 = require("@neondatabase/serverless");
+var import_pg2 = __toESM(require("pg"), 1);
 var import_http = require("http");
 
 // server/db.ts
-var import_neon_serverless = require("drizzle-orm/neon-serverless");
-var import_serverless = require("@neondatabase/serverless");
+var import_node_postgres = require("drizzle-orm/node-postgres");
+var import_pg = __toESM(require("pg"), 1);
 
 // shared/schema.ts
 var schema_exports = {};
@@ -152,12 +152,22 @@ var loginSchema = import_zod.z.object({
 });
 
 // server/db.ts
+var { Pool } = import_pg.default;
 var connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   console.error("[db] WARNING: DATABASE_URL is not set \u2014 database queries will fail");
 }
-var pool = new import_serverless.Pool({ connectionString });
-var db = (0, import_neon_serverless.drizzle)(pool, { schema: schema_exports });
+var pool = new Pool({
+  connectionString,
+  max: 2,
+  connectionTimeoutMillis: 8e3,
+  idleTimeoutMillis: 1e4,
+  ssl: connectionString && !connectionString.includes("localhost") ? { rejectUnauthorized: false } : void 0
+});
+pool.on("error", (err) => {
+  console.error("[db] pool error:", err.message);
+});
+var db = (0, import_node_postgres.drizzle)(pool, { schema: schema_exports });
 
 // server/storage.ts
 var import_drizzle_orm = require("drizzle-orm");
@@ -1488,6 +1498,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // server/vercelHandler.ts
+var { Pool: Pool2 } = import_pg2.default;
 var PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
 var app = (0, import_express.default)();
 app.post(
@@ -1519,7 +1530,13 @@ app.use(
   })
 );
 app.use(import_express.default.urlencoded({ extended: false }));
-var dbPool = process.env.DATABASE_URL ? new import_serverless2.Pool({ connectionString: process.env.DATABASE_URL }) : null;
+var dbPool = process.env.DATABASE_URL ? new Pool2({
+  connectionString: process.env.DATABASE_URL,
+  max: 2,
+  connectionTimeoutMillis: 8e3,
+  idleTimeoutMillis: 1e4,
+  ssl: process.env.DATABASE_URL.includes("localhost") ? void 0 : { rejectUnauthorized: false }
+}) : null;
 if (dbPool) {
   dbPool.on("error", (err) => {
     console.error("[vercel] pg pool error:", err.message);

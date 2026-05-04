@@ -40,7 +40,7 @@ var import_serverless2 = require("@neondatabase/serverless");
 var import_http = require("http");
 
 // server/db.ts
-var import_neon_http = require("drizzle-orm/neon-http");
+var import_neon_serverless = require("drizzle-orm/neon-serverless");
 var import_serverless = require("@neondatabase/serverless");
 
 // shared/schema.ts
@@ -156,8 +156,8 @@ var connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   console.error("[db] WARNING: DATABASE_URL is not set \u2014 database queries will fail");
 }
-var sql = (0, import_serverless.neon)(connectionString);
-var db = (0, import_neon_http.drizzle)(sql, { schema: schema_exports });
+var pool = new import_serverless.Pool({ connectionString });
+var db = (0, import_neon_serverless.drizzle)(pool, { schema: schema_exports });
 
 // server/storage.ts
 var import_drizzle_orm = require("drizzle-orm");

@@ -10,6 +10,9 @@ import { WebhookHandlers } from "./webhookHandlers";
 const PgStore = connectPgSimple(session);
 const app = express();
 
+// Trust Vercel's proxy so req.protocol returns "https" and cookies work correctly
+app.set("trust proxy", 1);
+
 app.post(
   "/api/stripe/webhook",
   express.raw({ type: "application/json" }),

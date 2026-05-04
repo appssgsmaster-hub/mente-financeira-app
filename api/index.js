@@ -69373,6 +69373,7 @@ var WebhookHandlers = class _WebhookHandlers {
 var { Pool: Pool4 } = esm_default;
 var PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
 var app = (0, import_express.default)();
+app.set("trust proxy", 1);
 app.post(
   "/api/stripe/webhook",
   import_express.default.raw({ type: "application/json" }),

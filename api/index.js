@@ -69404,7 +69404,7 @@ app.use(
 app.use(import_express.default.urlencoded({ extended: false }));
 function buildPoolConfig(url) {
   try {
-    const cleanUrl = url.replace(/[?&]sslmode=[^&]*/g, "").replace(/[?&]ssl=[^&]*/g, "").replace(/\?$/, "");
+    const cleanUrl = url.replace(/[?&]sslmode=[^&]*/g, "").replace(/[?&]ssl=[^&]*/g, "").replace(/[?&]channel_binding=[^&]*/g, "").replace(/\?&/, "?").replace(/\?$/, "").replace(/&&/g, "&");
     const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     return {
       connectionString: cleanUrl,

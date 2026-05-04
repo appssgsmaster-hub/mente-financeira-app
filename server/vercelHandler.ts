@@ -46,8 +46,14 @@ app.use(express.urlencoded({ extended: false }));
 // We strip the sslmode query param and handle SSL ourselves to avoid conflicts.
 function buildPoolConfig(url: string) {
   try {
-    // Remove sslmode param from URL so pg doesn't get confused by dual SSL config
-    const cleanUrl = url.replace(/[?&]sslmode=[^&]*/g, "").replace(/[?&]ssl=[^&]*/g, "").replace(/\?$/, "");
+    // Remove params pg doesn't understand — sslmode, ssl, channel_binding
+    const cleanUrl = url
+      .replace(/[?&]sslmode=[^&]*/g, "")
+      .replace(/[?&]ssl=[^&]*/g, "")
+      .replace(/[?&]channel_binding=[^&]*/g, "")
+      .replace(/\?&/, "?")
+      .replace(/\?$/, "")
+      .replace(/&&/g, "&");
     const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     return {
       connectionString: cleanUrl,

@@ -36,7 +36,7 @@ module.exports = __toCommonJS(vercelHandler_exports);
 var import_express = __toESM(require("express"), 1);
 var import_express_session = __toESM(require("express-session"), 1);
 var import_connect_pg_simple = __toESM(require("connect-pg-simple"), 1);
-var import_pg = __toESM(require("pg"), 1);
+var import_serverless2 = require("@neondatabase/serverless");
 var import_http = require("http");
 
 // server/db.ts
@@ -909,7 +909,8 @@ async function registerRoutes(httpServer, app2) {
       if (err instanceof import_zod3.z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      console.error("Register error:", err);
+      console.error("[register] Unexpected error:", err instanceof Error ? `${err.message}
+${err.stack}` : err);
       res.status(500).json({ message: "Erro ao criar conta" });
     }
   });
@@ -931,6 +932,8 @@ async function registerRoutes(httpServer, app2) {
       if (err instanceof import_zod3.z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
+      console.error("[login] Unexpected error:", err instanceof Error ? `${err.message}
+${err.stack}` : err);
       res.status(500).json({ message: "Erro no login" });
     }
   });
@@ -1485,7 +1488,6 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // server/vercelHandler.ts
-var { Pool } = import_pg.default;
 var PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
 var app = (0, import_express.default)();
 app.post(
@@ -1517,13 +1519,7 @@ app.use(
   })
 );
 app.use(import_express.default.urlencoded({ extended: false }));
-var dbPool = process.env.DATABASE_URL ? new Pool({
-  connectionString: process.env.DATABASE_URL,
-  connectionTimeoutMillis: 5e3,
-  idleTimeoutMillis: 1e4,
-  max: 3,
-  ssl: process.env.DATABASE_URL.includes("localhost") ? void 0 : { rejectUnauthorized: false }
-}) : null;
+var dbPool = process.env.DATABASE_URL ? new import_serverless2.Pool({ connectionString: process.env.DATABASE_URL }) : null;
 if (dbPool) {
   dbPool.on("error", (err) => {
     console.error("[vercel] pg pool error:", err.message);

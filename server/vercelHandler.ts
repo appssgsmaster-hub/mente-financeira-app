@@ -1,12 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import pkg from "pg";
+import { Pool } from "@neondatabase/serverless";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { WebhookHandlers } from "./webhookHandlers";
 
-const { Pool } = pkg;
 const PgStore = connectPgSimple(session);
 const app = express();
 
@@ -41,21 +40,10 @@ app.use(
 );
 app.use(express.urlencoded({ extended: false }));
 
-// Build a pg Pool with sensible Vercel-compatible defaults.
-// Neon (the DB Replit uses) requires SSL; set rejectUnauthorized: false
-// to accept Neon's managed certificate.
-// connectionTimeoutMillis prevents the Lambda from hanging forever on a
-// bad/missing DATABASE_URL and hitting Vercel's invocation timeout.
+// Use @neondatabase/serverless Pool — communicates over WebSockets instead of
+// raw TCP, which eliminates cold-start connection timeouts on Vercel Lambda.
 const dbPool = process.env.DATABASE_URL
-  ? new Pool({
-      connectionString: process.env.DATABASE_URL,
-      connectionTimeoutMillis: 5000,
-      idleTimeoutMillis: 10000,
-      max: 3,
-      ssl: process.env.DATABASE_URL.includes("localhost")
-        ? undefined
-        : { rejectUnauthorized: false },
-    })
+  ? new Pool({ connectionString: process.env.DATABASE_URL })
   : null;
 
 // Prevent unhandled pool errors from crashing the Lambda process.

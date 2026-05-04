@@ -87,7 +87,7 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      console.error("Register error:", err);
+      console.error("[register] Unexpected error:", err instanceof Error ? `${err.message}\n${err.stack}` : err);
       res.status(500).json({ message: "Erro ao criar conta" });
     }
   });
@@ -113,6 +113,7 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
+      console.error("[login] Unexpected error:", err instanceof Error ? `${err.message}\n${err.stack}` : err);
       res.status(500).json({ message: "Erro no login" });
     }
   });

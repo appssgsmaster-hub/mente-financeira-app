@@ -1,0 +1,59 @@
+Criar uma nova seção/aba dentro de Ajustes, logo abaixo do menu das contas/percentuais.
+
+Nome da seção: “Entenda suas contas”
+
+Objetivo:
+Explicar de forma simples o propósito de cada conta do método Mente Financeira, para que o usuário entenda para que serve cada conta, o que deve ser pago por ela e por que ela é importante.
+
+Formato:
+- Criar um card/seção separada abaixo dos ajustes das contas.
+- Dentro dessa seção, listar todas as contas.
+- Cada conta deve aparecer em formato de dropdown/accordion.
+- Ao clicar no nome da conta, abre a explicação.
+- Ao fechar, mantém a tela limpa e organizada.
+
+Contas e estrutura de cada dropdown:
+
+1. Pro-labore
+Explicar:
+- É o valor destinado ao pagamento do dono/sócio.
+- Serve para separar o dinheiro pessoal do dinheiro da empresa.
+- Deve cobrir despesas pessoais do empreendedor, como moradia, alimentação, transporte e vida pessoal.
+- Importância: evita que o dono retire dinheiro aleatoriamente do negócio.
+
+2. Operacional
+Explicar:
+- É a conta usada para manter o negócio funcionando no dia a dia.
+- Deve pagar despesas como fornecedores, ingredientes, mercadorias, embalagens, aluguel, energia, internet, salários e custos fixos.
+- Importância: garante que a empresa tenha dinheiro para operar sem depender de improviso.
+
+3. Taxas e Obrigações
+Explicar:
+- É a conta destinada a impostos, taxas, VAT, PAYE, contabilidade, Revenue, licenças e obrigações legais.
+- Importância: evita sustos quando chega o momento de pagar impostos ou responsabilidades fiscais.
+
+4. Reserva
+Explicar:
+- É a conta de segurança da empresa.
+- Deve ser usada para emergências, meses fracos, manutenção inesperada, consertos e imprevistos.
+- Importância: protege o negócio em períodos difíceis.
+
+5. Oportunidades
+Explicar:
+- É a conta destinada ao crescimento.
+- Pode ser usada para comprar equipamentos, investir em marketing, melhorar o espaço, fazer cursos, contratar ajuda ou expandir o negócio.
+- Importância: ajuda a empresa crescer com planejamento, sem comprometer o dinheiro das despesas essenciais.
+
+6. Lucro
+Explicar:
+- É a conta que mostra o resultado positivo do negócio.
+- Pode ser usada para distribuição de lucro, reinvestimento ou metas futuras.
+- Importância: ajuda o empreendedor enxergar se o negócio realmente está gerando retorno.
+
+Requisitos técnicos:
+- Não alterar a lógica de cálculo existente.
+- Não alterar os percentuais das contas.
+- Não mexer no dashboard principal.
+- Apenas adicionar essa nova seção visual e explicativa dentro da página Ajustes.
+- Manter o estilo visual atual do app Mente Financeira, usando cards, bordas arredondadas, ícones simples e layout responsivo para celular.
+- A seção deve funcionar bem no desktop e no mobile.

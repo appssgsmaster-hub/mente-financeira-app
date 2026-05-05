@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil, RefreshCw, ChevronDown, BookOpen, Wallet, Landmark, ShieldCheck, Rocket, TrendingUp } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 
@@ -334,11 +334,157 @@ export default function Settings() {
         </div>
       </Card>
 
+      <AccountGuideSection />
+
       <Card className="p-6 rounded-3xl border-border/50 shadow-sm">
         <h3 className="text-lg font-bold mb-2">Resetar Ecossistema</h3>
         <p className="text-sm text-muted-foreground mb-4">Isso apaga todas as transações e zera os saldos das contas.</p>
         <Button variant="destructive" onClick={handleReset} className="rounded-2xl">Resetar Tudo</Button>
       </Card>
     </div>
+  );
+}
+
+const ACCOUNT_GUIDE = [
+  {
+    icon: Wallet,
+    color: "text-violet-600 dark:text-violet-400",
+    bg: "bg-violet-50 dark:bg-violet-950/30",
+    border: "border-violet-200 dark:border-violet-800",
+    name: "Pro-labore",
+    tagline: "O salário do dono",
+    items: [
+      "É o valor destinado ao pagamento do dono ou sócio da empresa.",
+      "Serve para separar o dinheiro pessoal do dinheiro da empresa.",
+      "Deve cobrir despesas pessoais do empreendedor: moradia, alimentação, transporte e vida pessoal.",
+      "Importância: evita que o dono retire dinheiro aleatoriamente do negócio, comprometendo o fluxo de caixa.",
+    ],
+  },
+  {
+    icon: Landmark,
+    color: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950/30",
+    border: "border-blue-200 dark:border-blue-800",
+    name: "Operacional",
+    tagline: "O motor do dia a dia",
+    items: [
+      "É a conta usada para manter o negócio funcionando no dia a dia.",
+      "Deve pagar fornecedores, ingredientes, mercadorias, embalagens, aluguel, energia, internet, salários e custos fixos.",
+      "Importância: garante que a empresa tenha dinheiro para operar sem depender de improviso ou misturar caixas.",
+    ],
+  },
+  {
+    icon: ShieldCheck,
+    color: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-950/30",
+    border: "border-amber-200 dark:border-amber-800",
+    name: "Taxas e Obrigações",
+    tagline: "Fiscal em dia, empresa segura",
+    items: [
+      "É a conta destinada a impostos, taxas, VAT, PAYE, contabilidade, Revenue, licenças e obrigações legais.",
+      "Importância: evita sustos quando chega o momento de pagar impostos ou responsabilidades fiscais — o dinheiro já estará reservado.",
+    ],
+  },
+  {
+    icon: ShieldCheck,
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-50 dark:bg-emerald-950/30",
+    border: "border-emerald-200 dark:border-emerald-800",
+    name: "Reserva",
+    tagline: "O fundo de emergência",
+    items: [
+      "É a conta de segurança da empresa.",
+      "Deve ser usada para emergências, meses fracos, manutenção inesperada, consertos e imprevistos.",
+      "Importância: protege o negócio em períodos difíceis sem precisar recorrer a empréstimos ou comprometer outras contas.",
+    ],
+  },
+  {
+    icon: Rocket,
+    color: "text-orange-600 dark:text-orange-400",
+    bg: "bg-orange-50 dark:bg-orange-950/30",
+    border: "border-orange-200 dark:border-orange-800",
+    name: "Oportunidades",
+    tagline: "O motor do crescimento",
+    items: [
+      "É a conta destinada ao crescimento planejado da empresa.",
+      "Pode ser usada para comprar equipamentos, investir em marketing, melhorar o espaço, fazer cursos, contratar ajuda ou expandir o negócio.",
+      "Importância: ajuda a empresa crescer com planejamento, sem comprometer o dinheiro das despesas essenciais.",
+    ],
+  },
+  {
+    icon: TrendingUp,
+    color: "text-secondary",
+    bg: "bg-secondary/5",
+    border: "border-secondary/20",
+    name: "Lucro",
+    tagline: "O resultado do trabalho",
+    items: [
+      "É a conta que mostra o resultado positivo do negócio.",
+      "Pode ser usada para distribuição de lucro entre sócios, reinvestimento ou acumulação para metas futuras.",
+      "Importância: ajuda o empreendedor enxergar se o negócio realmente está gerando retorno financeiro real.",
+    ],
+  },
+];
+
+function AccountGuideSection() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  return (
+    <Card className="p-8 rounded-3xl border-border/50 shadow-sm">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2.5 bg-primary/10 rounded-2xl text-primary">
+          <BookOpen className="w-5 h-5" />
+        </div>
+        <div>
+          <h2 className="text-xl font-display font-bold text-foreground">Entenda suas contas</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Descubra o propósito de cada conta do método Mente Financeira.</p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {ACCOUNT_GUIDE.map((account, idx) => {
+          const Icon = account.icon;
+          const isOpen = openIndex === idx;
+
+          return (
+            <div
+              key={account.name}
+              className={`rounded-2xl border transition-all duration-200 overflow-hidden ${isOpen ? `${account.border} ${account.bg}` : "border-border/40 hover:border-border/70 bg-background"}`}
+              data-testid={`accordion-account-${idx}`}
+            >
+              <button
+                onClick={() => setOpenIndex(isOpen ? null : idx)}
+                className="w-full flex items-center justify-between p-4 sm:p-5 text-left gap-3"
+                data-testid={`button-account-guide-${idx}`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isOpen ? account.bg : "bg-muted"} border ${isOpen ? account.border : "border-border/30"}`}>
+                    <Icon className={`w-4.5 h-4.5 ${isOpen ? account.color : "text-muted-foreground"}`} style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`font-bold text-sm sm:text-base leading-tight ${isOpen ? "text-foreground" : "text-foreground"}`}>{account.name}</p>
+                    <p className={`text-xs mt-0.5 ${isOpen ? "text-muted-foreground" : "text-muted-foreground/70"}`}>{account.tagline}</p>
+                  </div>
+                </div>
+                <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {isOpen && (
+                <div className="px-5 pb-5 pt-1">
+                  <ul className="space-y-2.5">
+                    {account.items.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2.5">
+                        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${account.color.replace("text-", "bg-")}`} />
+                        <p className="text-sm text-foreground/80 leading-relaxed">{item}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }

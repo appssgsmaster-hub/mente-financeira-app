@@ -18,6 +18,10 @@ import {
   CreditCard,
   ChevronDown,
   Download,
+  Building2,
+  BarChart3,
+  Target,
+  User,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -898,6 +902,58 @@ export default function Dashboard() {
           </Card>
         );
       })()}
+
+      {/* ── Upgrade prompt: Personal → Business ── */}
+      {(user as any)?.accountType !== "business" && (
+        <div className="rounded-3xl border-2 border-dashed border-secondary/30 bg-secondary/[0.03] p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5" data-testid="card-upgrade-to-business">
+          <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center shrink-0">
+            <Building2 className="w-6 h-6 text-secondary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-foreground">Expanda para a Conta Empresarial</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Ative custos fixos administrativos, cálculo de lucro líquido e distribuição de resultados entre sócios.</p>
+            <div className="flex flex-wrap gap-3 mt-3">
+              {[
+                { icon: BarChart3, label: "Distribuição de Resultados" },
+                { icon: Target, label: "Custos Fixos" },
+                { icon: Sparkles, label: "Gestão Avançada" },
+              ].map(({ icon: Icon, label }) => (
+                <span key={label} className="flex items-center gap-1.5 text-xs font-semibold text-secondary bg-secondary/10 px-3 py-1 rounded-full border border-secondary/20">
+                  <Icon className="w-3 h-3" /> {label}
+                </span>
+              ))}
+            </div>
+          </div>
+          <Button
+            onClick={() => navigate("/planos")}
+            className="shrink-0 bg-secondary hover:bg-secondary/90 rounded-2xl px-6 shadow-md"
+            data-testid="button-upgrade-to-business"
+          >
+            Ver Planos <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
+      )}
+
+      {/* ── Upgrade prompt: Business → also unlock Personal mode ── */}
+      {(user as any)?.accountType === "business" && (
+        <div className="rounded-3xl border-2 border-dashed border-primary/30 bg-primary/[0.03] p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5" data-testid="card-upgrade-to-personal">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+            <User className="w-6 h-6 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-foreground">Adicione o Modo Pessoal</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Complemente a gestão empresarial com o método das 6 contas para suas finanças pessoais.</p>
+          </div>
+          <Button
+            onClick={() => navigate("/planos")}
+            variant="outline"
+            className="shrink-0 rounded-2xl px-6 border-primary/30 text-primary hover:bg-primary/5"
+            data-testid="button-add-personal-mode"
+          >
+            Saiba Mais <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -118,7 +118,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByResetToken(token: string): Promise<User | undefined>;
-  createUser(data: { name: string; email: string; passwordHash: string }): Promise<User>;
+  createUser(data: { name: string; email: string; passwordHash: string; accountType?: string }): Promise<User>;
   updateUser(id: number, data: Partial<User>): Promise<User>;
   getAccounts(userId: number): Promise<Account[]>;
   updateAccountPercentages(userId: number, updates: UpdateAccountPercentagesRequest['updates']): Promise<Account[]>;
@@ -169,7 +169,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(data: { name: string; email: string; passwordHash: string }): Promise<User> {
+  async createUser(data: { name: string; email: string; passwordHash: string; accountType?: string }): Promise<User> {
     const trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + 7);
 
@@ -178,6 +178,7 @@ export class DatabaseStorage implements IStorage {
       email: data.email.toLowerCase(),
       passwordHash: data.passwordHash,
       currency: "BRL",
+      accountType: data.accountType ?? "personal",
       trialEndDate: trialEnd,
       subscriptionStatus: "trial",
     }).returning();

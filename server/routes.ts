@@ -76,6 +76,7 @@ export async function registerRoutes(
         name: data.name,
         email: data.email,
         passwordHash,
+        accountType: data.accountType ?? "personal",
       });
 
       await storage.seedDefaultAccounts(user.id);

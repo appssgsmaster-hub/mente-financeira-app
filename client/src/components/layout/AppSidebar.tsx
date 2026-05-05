@@ -8,8 +8,10 @@ import {
   Sparkles,
   Shield,
   LogOut,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useUser } from "@/hooks/use-finance";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -22,12 +24,13 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 
-const NAV_ITEMS: { title: string; href: string; icon: typeof LayoutDashboard; highlight?: boolean }[] = [
+const BASE_NAV_ITEMS: { title: string; href: string; icon: typeof LayoutDashboard; highlight?: boolean; businessOnly?: boolean }[] = [
   { title: "Painel", href: "/", icon: LayoutDashboard },
   { title: "Ajustes", href: "/ajustes", icon: SlidersHorizontal },
   { title: "Projeções", href: "/projecoes", icon: TrendingUp },
   { title: "Pagamentos", href: "/pagamentos", icon: CreditCard },
   { title: "Dívidas", href: "/dividas", icon: Shield },
+  { title: "Resultados", href: "/resultados", icon: BarChart3, businessOnly: true },
   { title: "Educação", href: "/educacao", icon: BookOpen },
   { title: "Planos & Pagamento", href: "/planos", icon: Sparkles, highlight: true },
 ];
@@ -35,6 +38,9 @@ const NAV_ITEMS: { title: string; href: string; icon: typeof LayoutDashboard; hi
 export function AppSidebar() {
   const [location] = useLocation();
   const { logout } = useAuth();
+  const { data: user } = useUser();
+  const isBusiness = user?.accountType === "business";
+  const NAV_ITEMS = BASE_NAV_ITEMS.filter(item => !item.businessOnly || isBusiness);
 
   return (
     <Sidebar variant="inset" className="border-r border-border/50 bg-sidebar/50 backdrop-blur-xl">

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil, RefreshCw, User, Building2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 
@@ -23,6 +23,7 @@ export default function Settings() {
 
   const [selectedCurrency, setSelectedCurrency] = useState(user?.currency || "BRL");
   const [isUpdatingCurrency, setIsUpdatingCurrency] = useState(false);
+  const [isUpdatingAccountType, setIsUpdatingAccountType] = useState(false);
 
   // Edit Account States
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
@@ -45,6 +46,24 @@ export default function Settings() {
       );
     }
   }, [accounts]);
+
+  const handleAccountTypeChange = async (type: "personal" | "business") => {
+    setIsUpdatingAccountType(true);
+    try {
+      const res = await fetch(api.user.update.path, {
+        method: api.user.update.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountType: type }),
+      });
+      if (!res.ok) throw new Error();
+      toast({ title: "Tipo de conta atualizado", description: type === "business" ? "Funcionalidades empresariais ativadas." : "Modo pessoal ativado." });
+      queryClient.invalidateQueries({ queryKey: [api.user.get.path] });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível alterar o tipo de conta.", variant: "destructive" });
+    } finally {
+      setIsUpdatingAccountType(false);
+    }
+  };
 
   const handleCurrencyChange = async (currency: string) => {
     setIsUpdatingCurrency(true);
@@ -206,6 +225,64 @@ export default function Settings() {
           <option value="USD">USD ($)</option>
           <option value="GBP">GBP (£)</option>
         </select>
+      </Card>
+
+      <Card className="p-6 rounded-3xl border-border/50 shadow-sm">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2 bg-primary/10 rounded-full text-primary">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-foreground">Tipo de Conta</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Ativa funcionalidades para uso pessoal ou empresarial.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            data-testid="button-account-personal"
+            disabled={isUpdatingAccountType}
+            onClick={() => handleAccountTypeChange("personal")}
+            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${
+              user?.accountType !== "business"
+                ? "border-primary bg-primary/5 shadow-sm"
+                : "border-border/40 hover:border-border"
+            }`}
+          >
+            <User className={`w-7 h-7 ${user?.accountType !== "business" ? "text-primary" : "text-muted-foreground"}`} />
+            <div className="text-center">
+              <p className={`font-semibold text-sm ${user?.accountType !== "business" ? "text-primary" : "text-muted-foreground"}`}>Pessoal</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Gestão financeira individual</p>
+            </div>
+            {user?.accountType !== "business" && (
+              <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">ATIVO</span>
+            )}
+          </button>
+          <button
+            data-testid="button-account-business"
+            disabled={isUpdatingAccountType}
+            onClick={() => handleAccountTypeChange("business")}
+            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${
+              user?.accountType === "business"
+                ? "border-secondary bg-secondary/5 shadow-sm"
+                : "border-border/40 hover:border-border"
+            }`}
+          >
+            <Building2 className={`w-7 h-7 ${user?.accountType === "business" ? "text-secondary" : "text-muted-foreground"}`} />
+            <div className="text-center">
+              <p className={`font-semibold text-sm ${user?.accountType === "business" ? "text-secondary" : "text-muted-foreground"}`}>Empresarial</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Custos fixos + distribuição de lucros</p>
+            </div>
+            {user?.accountType === "business" && (
+              <span className="text-[10px] font-bold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full">ATIVO</span>
+            )}
+          </button>
+        </div>
+        {isUpdatingAccountType && (
+          <div className="flex items-center gap-2 mt-3 text-muted-foreground text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Atualizando...</span>
+          </div>
+        )}
       </Card>
 
       <Card className="p-8 rounded-3xl border-border/50 shadow-sm">

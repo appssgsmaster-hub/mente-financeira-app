@@ -326,3 +326,73 @@ export function useRecalculateBalances() {
     onSuccess: () => sync(),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Business Settings
+// ---------------------------------------------------------------------------
+
+export function useBusinessSettings() {
+  return useQuery({
+    queryKey: ["/api/business-settings"],
+    queryFn: () => apiFetch<{ retentionPct: number; partnersPct: number; mentorshipPct: number }>("/api/business-settings"),
+  });
+}
+
+export function useUpsertBusinessSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { retentionPct: number; partnersPct: number; mentorshipPct: number }) =>
+      apiFetch("/api/business-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/business-settings"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fixed Costs
+// ---------------------------------------------------------------------------
+
+export function useFixedCosts() {
+  return useQuery({
+    queryKey: ["/api/fixed-costs"],
+    queryFn: () => apiFetch<{ id: number; userId: number; description: string; amount: number; category: string | null }[]>("/api/fixed-costs"),
+  });
+}
+
+export function useCreateFixedCost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { description: string; amount: number; category?: string }) =>
+      apiFetch("/api/fixed-costs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/fixed-costs"] }),
+  });
+}
+
+export function useUpdateFixedCost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { description?: string; amount?: number; category?: string } }) =>
+      apiFetch(`/api/fixed-costs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/fixed-costs"] }),
+  });
+}
+
+export function useDeleteFixedCost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch(`/api/fixed-costs/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/fixed-costs"] }),
+  });
+}

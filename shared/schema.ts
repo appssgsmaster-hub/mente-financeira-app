@@ -8,6 +8,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   currency: text("currency").notNull().default("EUR"),
+  accountType: text("account_type").notNull().default("personal"),
   trialStartDate: timestamp("trial_start_date").notNull().defaultNow(),
   trialEndDate: timestamp("trial_end_date"),
   stripeCustomerId: text("stripe_customer_id"),
@@ -55,9 +56,6 @@ export const commitments = pgTable("commitments", {
   commitmentType: text("commitment_type").notNull().default("expense"),
   paidPeriods: text("paid_periods").array().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  // Future fields (structure only — not implemented yet):
-  // status: text("status").default("pendente"),      // "pendente" | "pago" | "atrasado"
-  // paymentDate: text("payment_date"),               // data em que foi efetivamente pago
 });
 
 export const transactionAllocations = pgTable("transaction_allocations", {
@@ -78,6 +76,22 @@ export const debts = pgTable("debts", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const businessSettings = pgTable("business_settings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  retentionPct: real("retention_pct").notNull().default(0),
+  partnersPct: real("partners_pct").notNull().default(0),
+  mentorshipPct: real("mentorship_pct").notNull().default(0),
+});
+
+export const fixedCosts = pgTable("fixed_costs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  description: text("description").notNull(),
+  amount: integer("amount").notNull(),
+  category: text("category"),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, trialStartDate: true });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true });
 export const insertTransactionSchema = createInsertSchema(transactions)
@@ -88,6 +102,8 @@ export const insertTransactionSchema = createInsertSchema(transactions)
   });
 export const insertCommitmentSchema = createInsertSchema(commitments).omit({ id: true, createdAt: true });
 export const insertDebtSchema = createInsertSchema(debts).omit({ id: true, createdAt: true });
+export const insertBusinessSettingsSchema = createInsertSchema(businessSettings).omit({ id: true });
+export const insertFixedCostSchema = createInsertSchema(fixedCosts).omit({ id: true });
 
 export const registerSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -116,6 +132,12 @@ export type Debt = typeof debts.$inferSelect;
 export type InsertDebt = z.infer<typeof insertDebtSchema>;
 
 export type TransactionAllocation = typeof transactionAllocations.$inferSelect;
+
+export type BusinessSettings = typeof businessSettings.$inferSelect;
+export type InsertBusinessSettings = z.infer<typeof insertBusinessSettingsSchema>;
+
+export type FixedCost = typeof fixedCosts.$inferSelect;
+export type InsertFixedCost = z.infer<typeof insertFixedCostSchema>;
 
 export type UpdateAccountPercentagesRequest = {
   updates: { id: number; percentage: number }[];

@@ -1,11 +1,14 @@
 import { db } from "./db";
 import {
   users, accounts, transactions, transactionAllocations, commitments, debts,
+  businessSettings, fixedCosts,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Transaction, type InsertTransaction,
   type Commitment, type InsertCommitment,
   type Debt, type InsertDebt,
+  type BusinessSettings, type InsertBusinessSettings,
+  type FixedCost, type InsertFixedCost,
   type UpdateAccountPercentagesRequest,
   type DistributeIncomeRequest
 } from "@shared/schema";
@@ -142,6 +145,12 @@ export interface IStorage {
   getStripeSubscription(subscriptionId: string): Promise<any>;
   listStripeProductsWithPrices(): Promise<any[]>;
   recalculateAccountBalances(userId: number): Promise<Account[]>;
+  getBusinessSettings(userId: number): Promise<BusinessSettings | null>;
+  upsertBusinessSettings(userId: number, data: Partial<Omit<BusinessSettings, 'id' | 'userId'>>): Promise<BusinessSettings>;
+  getFixedCosts(userId: number): Promise<FixedCost[]>;
+  createFixedCost(data: InsertFixedCost): Promise<FixedCost>;
+  updateFixedCost(userId: number, id: number, data: Partial<FixedCost>): Promise<FixedCost>;
+  deleteFixedCost(userId: number, id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -500,6 +509,48 @@ export class DatabaseStorage implements IStorage {
       sql`SELECT * FROM stripe.subscriptions WHERE id = ${subscriptionId}`
     );
     return result.rows[0] || null;
+  }
+
+  async getBusinessSettings(userId: number): Promise<BusinessSettings | null> {
+    const [row] = await db.select().from(businessSettings).where(eq(businessSettings.userId, userId));
+    return row ?? null;
+  }
+
+  async upsertBusinessSettings(userId: number, data: Partial<Omit<BusinessSettings, 'id' | 'userId'>>): Promise<BusinessSettings> {
+    const existing = await this.getBusinessSettings(userId);
+    if (existing) {
+      const [updated] = await db.update(businessSettings)
+        .set(data)
+        .where(eq(businessSettings.userId, userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(businessSettings)
+      .values({ userId, retentionPct: 0, partnersPct: 0, mentorshipPct: 0, ...data })
+      .returning();
+    return created;
+  }
+
+  async getFixedCosts(userId: number): Promise<FixedCost[]> {
+    return db.select().from(fixedCosts).where(eq(fixedCosts.userId, userId));
+  }
+
+  async createFixedCost(data: InsertFixedCost): Promise<FixedCost> {
+    const [row] = await db.insert(fixedCosts).values(data).returning();
+    return row;
+  }
+
+  async updateFixedCost(userId: number, id: number, data: Partial<FixedCost>): Promise<FixedCost> {
+    const [existing] = await db.select().from(fixedCosts).where(eq(fixedCosts.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Custo fixo não encontrado");
+    const [updated] = await db.update(fixedCosts).set(data).where(eq(fixedCosts.id, id)).returning();
+    return updated;
+  }
+
+  async deleteFixedCost(userId: number, id: number): Promise<void> {
+    const [existing] = await db.select().from(fixedCosts).where(eq(fixedCosts.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Custo fixo não encontrado");
+    await db.delete(fixedCosts).where(eq(fixedCosts.id, id));
   }
 
   async listStripeProductsWithPrices(): Promise<any[]> {

@@ -261,8 +261,16 @@ export async function registerRoutes(
 
   app.patch(api.user.update.path, requireActiveSubscription, async (req, res) => {
     try {
-      const { currency } = req.body;
-      const updated = await storage.updateUserCurrency(req.session.userId!, currency);
+      const { currency, accountType } = req.body;
+      let updated;
+      if (accountType !== undefined) {
+        if (accountType !== "personal" && accountType !== "business") {
+          return res.status(400).json({ message: "accountType must be 'personal' or 'business'" });
+        }
+        updated = await storage.updateUser(req.session.userId!, { accountType });
+      } else {
+        updated = await storage.updateUserCurrency(req.session.userId!, currency);
+      }
       const { passwordHash: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (err) {
@@ -637,6 +645,81 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Purchase sync error:", err);
       res.json({ status: null });
+    }
+  });
+
+  // ── Business Settings ─────────────────────────────────────────────────────
+  app.get("/api/business-settings", requireAuth, async (req, res) => {
+    try {
+      const settings = await storage.getBusinessSettings(req.session.userId!);
+      res.json(settings ?? { userId: req.session.userId, retentionPct: 0, partnersPct: 0, mentorshipPct: 0 });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar configurações" });
+    }
+  });
+
+  app.put("/api/business-settings", requireAuth, async (req, res) => {
+    try {
+      const { retentionPct, partnersPct, mentorshipPct } = req.body;
+      const settings = await storage.upsertBusinessSettings(req.session.userId!, {
+        retentionPct: Number(retentionPct) || 0,
+        partnersPct: Number(partnersPct) || 0,
+        mentorshipPct: Number(mentorshipPct) || 0,
+      });
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao salvar configurações" });
+    }
+  });
+
+  // ── Fixed Costs ────────────────────────────────────────────────────────────
+  app.get("/api/fixed-costs", requireAuth, async (req, res) => {
+    try {
+      const costs = await storage.getFixedCosts(req.session.userId!);
+      res.json(costs);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar custos fixos" });
+    }
+  });
+
+  app.post("/api/fixed-costs", requireAuth, async (req, res) => {
+    try {
+      const { description, amount, category } = req.body;
+      if (!description || !amount) return res.status(400).json({ message: "Descrição e valor são obrigatórios" });
+      const cost = await storage.createFixedCost({
+        userId: req.session.userId!,
+        description: String(description),
+        amount: Math.round(Number(amount) * 100),
+        category: category ?? null,
+      });
+      res.status(201).json(cost);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao criar custo fixo" });
+    }
+  });
+
+  app.patch("/api/fixed-costs/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params["id"] as string);
+      const { description, amount, category } = req.body;
+      const updates: any = {};
+      if (description !== undefined) updates.description = String(description);
+      if (amount !== undefined) updates.amount = Math.round(Number(amount) * 100);
+      if (category !== undefined) updates.category = category;
+      const cost = await storage.updateFixedCost(req.session.userId!, id, updates);
+      res.json(cost);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar custo fixo" });
+    }
+  });
+
+  app.delete("/api/fixed-costs/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params["id"] as string);
+      await storage.deleteFixedCost(req.session.userId!, id);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao apagar custo fixo" });
     }
   });
 

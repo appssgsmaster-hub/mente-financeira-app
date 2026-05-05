@@ -60,13 +60,13 @@ function buildPoolConfig(url: string) {
     const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     return {
       connectionString: cleanUrl,
-      max: 2,
-      connectionTimeoutMillis: 5000,
-      idleTimeoutMillis: 10000,
+      max: 3,
+      connectionTimeoutMillis: 30000,
+      idleTimeoutMillis: 20000,
       ssl: isLocal ? undefined : { rejectUnauthorized: false },
     };
   } catch {
-    return { connectionString: url, max: 2, connectionTimeoutMillis: 5000 };
+    return { connectionString: url, max: 3, connectionTimeoutMillis: 30000 };
   }
 }
 

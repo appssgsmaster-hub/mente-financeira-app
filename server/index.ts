@@ -5,6 +5,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { WebhookHandlers } from "./webhookHandlers";
+import { pool, warmUpDb } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -54,7 +55,7 @@ const isProduction = process.env.NODE_ENV === "production";
 app.use(
   session({
     store: new PgStore({
-      conString: process.env.DATABASE_URL,
+      pool,
       createTableIfMissing: true,
     }),
     secret: process.env.SESSION_SECRET!,
@@ -189,6 +190,10 @@ async function initStripe() {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
+
+  // Wake Neon's compute endpoint before accepting traffic so the first login
+  // doesn't time out after a cold start or auto-suspend.
+  await warmUpDb();
 
   httpServer.listen(
     {

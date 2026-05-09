@@ -1,0 +1,91 @@
+No módulo de Faturas do SGS Processos, preciso ajustar o modelo da invoice/PDF para ficar mais profissional e parecido com meu modelo atual.
+
+1. Dados da minha empresa
+Criar uma área em Ajustes/Configurações chamada “Dados da Empresa para Faturas”, com campos editáveis:
+- Nome da empresa
+- Endereço linha 1
+- Endereço linha 2
+- Cidade / County
+- Telefone
+- Email
+- Número de registro
+- VAT number, se houver
+- Logo da empresa, se possível
+
+Esses dados devem aparecer automaticamente no topo da invoice/PDF.
+
+2. Dados bancários
+Criar uma área editável chamada “Dados de Pagamento”, com:
+- Nome do titular
+- Nome do banco
+- IBAN
+- BIC
+- Observação de pagamento
+
+Esses dados devem aparecer no final da invoice/PDF com o texto:
+
+“To make the payment, please use the details below.”
+
+3. Stripe como opcional
+Adicionar campo opcional na fatura:
+- Stripe Payment Link
+
+Se houver link do Stripe, mostrar no PDF:
+“Pay online: [link]”
+
+Se não houver link, mostrar apenas os dados bancários.
+
+Não integrar Stripe automaticamente agora. Apenas deixar o campo manual para eu colar o link quando quiser.
+
+4. Modelo visual da invoice/PDF
+A invoice deve ter:
+- Título “Invoice”
+- Número da invoice
+- Data
+- ID do cliente
+- Terms
+- Invoice to
+- Nome do cliente
+- Empresa/empregador
+- Endereço
+- Telefone, se houver
+- Referência do processo
+- Nome do processo
+- Nome do cliente vinculado ao processo
+
+5. Tabela de serviços
+A tabela deve ter colunas:
+- Nº
+- Service Description
+- QTD
+- Service Value
+- Amount
+
+Corrigir o nome da última coluna: hoje aparece “Quantity”, mas deve ser “Amount” ou “Total”.
+
+6. Totais
+No final da fatura mostrar:
+- Subtotal
+- VAT %
+- VAT amount, se aplicável
+- Total
+
+7. Mensagem final
+Adicionar no rodapé:
+
+“Thank you for choosing us!”
+
+E também:
+
+“If you have any questions regarding this invoice, please contact us.”
+
+Com telefone e email da empresa.
+
+8. Compatibilidade com Vercel
+- Salvar os dados da empresa e dados bancários no banco de dados ou em configuração segura.
+- Não deixar dados sensíveis hardcoded.
+- Manter compatibilidade com Vercel/Neon.
+- Não quebrar o fluxo atual de criação de faturas.
+
+Importante:
+Não alterar outras áreas do sistema. Apenas melhorar a estrutura da invoice/PDF e adicionar os dados editáveis da empresa e pagamento.

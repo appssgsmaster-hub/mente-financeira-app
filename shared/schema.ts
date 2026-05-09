@@ -92,62 +92,6 @@ export const fixedCosts = pgTable("fixed_costs", {
   category: text("category"),
 });
 
-// ─── Invoice Module ───────────────────────────────────────────────────────────
-
-export const companyProfile = pgTable("company_profile", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().unique(),
-  companyName: text("company_name").notNull().default(""),
-  addressLine1: text("address_line1").notNull().default(""),
-  addressLine2: text("address_line2").notNull().default(""),
-  city: text("city").notNull().default(""),
-  phone: text("phone").notNull().default(""),
-  email: text("email").notNull().default(""),
-  registrationNumber: text("registration_number").notNull().default(""),
-  vatNumber: text("vat_number").notNull().default(""),
-  logoUrl: text("logo_url"),
-});
-
-export const bankDetails = pgTable("bank_details", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().unique(),
-  accountHolder: text("account_holder").notNull().default(""),
-  bankName: text("bank_name").notNull().default(""),
-  iban: text("iban").notNull().default(""),
-  bic: text("bic").notNull().default(""),
-  paymentNote: text("payment_note").notNull().default(""),
-});
-
-export const invoices = pgTable("invoices", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  invoiceNumber: text("invoice_number").notNull(),
-  invoiceDate: text("invoice_date").notNull(),
-  terms: text("terms").notNull().default(""),
-  clientId: text("client_id").notNull().default(""),
-  clientName: text("client_name").notNull(),
-  clientCompany: text("client_company").notNull().default(""),
-  clientAddress: text("client_address").notNull().default(""),
-  clientPhone: text("client_phone").notNull().default(""),
-  processRef: text("process_ref").notNull().default(""),
-  processName: text("process_name").notNull().default(""),
-  vatPercent: real("vat_percent").notNull().default(0),
-  stripePaymentLink: text("stripe_payment_link"),
-  status: text("status").notNull().default("draft"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const invoiceItems = pgTable("invoice_items", {
-  id: serial("id").primaryKey(),
-  invoiceId: integer("invoice_id").notNull(),
-  serviceDescription: text("service_description").notNull(),
-  quantity: real("quantity").notNull().default(1),
-  serviceValue: integer("service_value").notNull(),
-  position: integer("position").notNull().default(0),
-});
-
-// ─── Insert schemas ───────────────────────────────────────────────────────────
-
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, trialStartDate: true });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true });
 export const insertTransactionSchema = createInsertSchema(transactions)
@@ -160,10 +104,6 @@ export const insertCommitmentSchema = createInsertSchema(commitments).omit({ id:
 export const insertDebtSchema = createInsertSchema(debts).omit({ id: true, createdAt: true });
 export const insertBusinessSettingsSchema = createInsertSchema(businessSettings).omit({ id: true });
 export const insertFixedCostSchema = createInsertSchema(fixedCosts).omit({ id: true });
-export const insertCompanyProfileSchema = createInsertSchema(companyProfile).omit({ id: true });
-export const insertBankDetailsSchema = createInsertSchema(bankDetails).omit({ id: true });
-export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true });
-export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true });
 
 export const registerSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -176,8 +116,6 @@ export const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(1, "Senha é obrigatória"),
 });
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -201,20 +139,6 @@ export type InsertBusinessSettings = z.infer<typeof insertBusinessSettingsSchema
 
 export type FixedCost = typeof fixedCosts.$inferSelect;
 export type InsertFixedCost = z.infer<typeof insertFixedCostSchema>;
-
-export type CompanyProfile = typeof companyProfile.$inferSelect;
-export type InsertCompanyProfile = z.infer<typeof insertCompanyProfileSchema>;
-
-export type BankDetails = typeof bankDetails.$inferSelect;
-export type InsertBankDetails = z.infer<typeof insertBankDetailsSchema>;
-
-export type Invoice = typeof invoices.$inferSelect;
-export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
-
-export type InvoiceItem = typeof invoiceItems.$inferSelect;
-export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
-
-export type InvoiceWithItems = Invoice & { items: InvoiceItem[] };
 
 export type UpdateAccountPercentagesRequest = {
   updates: { id: number; percentage: number }[];

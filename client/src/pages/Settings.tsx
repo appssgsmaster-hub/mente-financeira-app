@@ -1,15 +1,13 @@
 import { useState, useEffect } from "react";
 import { useAccounts, useUpdateAccountPercentages, useUser } from "@/hooks/use-finance";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil, RefreshCw, ChevronDown, BookOpen, Wallet, Landmark, ShieldCheck, Rocket, TrendingUp, Building2, Banknote, Save } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil, RefreshCw, ChevronDown, BookOpen, Wallet, Landmark, ShieldCheck, Rocket, TrendingUp } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
-import type { CompanyProfile, BankDetails } from "@shared/schema";
 
 export default function Settings() {
   const { data: user } = useUser();
@@ -336,9 +334,6 @@ export default function Settings() {
         </div>
       </Card>
 
-      <CompanyProfileSection />
-      <BankDetailsSection />
-
       <AccountGuideSection />
 
       <Card className="p-6 rounded-3xl border-border/50 shadow-sm">
@@ -490,197 +485,6 @@ function AccountGuideSection() {
           );
         })}
       </div>
-    </Card>
-  );
-}
-
-// ─── Company Profile Section ──────────────────────────────────────────────────
-
-function CompanyProfileSection() {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const { data: profile, isLoading } = useQuery<CompanyProfile | null>({ queryKey: ["/api/company-profile"] });
-
-  const [form, setForm] = useState({
-    companyName: "", addressLine1: "", addressLine2: "", city: "",
-    phone: "", email: "", registrationNumber: "", vatNumber: "", logoUrl: "",
-  });
-
-  useEffect(() => {
-    if (profile) {
-      setForm({
-        companyName: profile.companyName ?? "",
-        addressLine1: profile.addressLine1 ?? "",
-        addressLine2: profile.addressLine2 ?? "",
-        city: profile.city ?? "",
-        phone: profile.phone ?? "",
-        email: profile.email ?? "",
-        registrationNumber: profile.registrationNumber ?? "",
-        vatNumber: profile.vatNumber ?? "",
-        logoUrl: profile.logoUrl ?? "",
-      });
-    }
-  }, [profile]);
-
-  const { mutate: save, isPending } = useMutation({
-    mutationFn: async (data: typeof form) => {
-      const res = await fetch("/api/company-profile", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        credentials: "include", body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error();
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/company-profile"] });
-      toast({ title: "Dados da empresa salvos!" });
-    },
-    onError: () => toast({ title: "Erro ao salvar", variant: "destructive" }),
-  });
-
-  const inputCls = "w-full p-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
-  const labelCls = "text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 block";
-
-  return (
-    <Card className="p-8 rounded-3xl border-border/50 shadow-sm">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2.5 bg-primary/10 rounded-2xl text-primary"><Building2 className="w-5 h-5" /></div>
-        <div>
-          <h2 className="text-xl font-display font-bold">Dados da Empresa para Faturas</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Aparecem automaticamente no topo de cada fatura gerada.</p>
-        </div>
-      </div>
-      {isLoading ? <div className="text-muted-foreground text-sm">Carregando...</div> : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label className={labelCls}>Nome da Empresa</label>
-              <input className={inputCls} value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} placeholder="SGS Group Ltd" data-testid="input-company-name" />
-            </div>
-            <div>
-              <label className={labelCls}>Endereço Linha 1</label>
-              <input className={inputCls} value={form.addressLine1} onChange={e => setForm(f => ({ ...f, addressLine1: e.target.value }))} placeholder="123 Main Street" data-testid="input-address1" />
-            </div>
-            <div>
-              <label className={labelCls}>Endereço Linha 2</label>
-              <input className={inputCls} value={form.addressLine2} onChange={e => setForm(f => ({ ...f, addressLine2: e.target.value }))} placeholder="Suite 4A" data-testid="input-address2" />
-            </div>
-            <div>
-              <label className={labelCls}>Cidade / County</label>
-              <input className={inputCls} value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="Dublin, Co. Dublin" data-testid="input-city" />
-            </div>
-            <div>
-              <label className={labelCls}>Telefone</label>
-              <input className={inputCls} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+353 1 234 5678" data-testid="input-company-phone" />
-            </div>
-            <div>
-              <label className={labelCls}>Email</label>
-              <input className={inputCls} value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="info@sgsgroup.ie" data-testid="input-company-email" />
-            </div>
-            <div>
-              <label className={labelCls}>Número de Registro</label>
-              <input className={inputCls} value={form.registrationNumber} onChange={e => setForm(f => ({ ...f, registrationNumber: e.target.value }))} placeholder="IE123456" data-testid="input-reg-number" />
-            </div>
-            <div>
-              <label className={labelCls}>VAT Number (se houver)</label>
-              <input className={inputCls} value={form.vatNumber} onChange={e => setForm(f => ({ ...f, vatNumber: e.target.value }))} placeholder="IE1234567A" data-testid="input-vat-number" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className={labelCls}>URL do Logo (opcional)</label>
-              <input className={inputCls} value={form.logoUrl} onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))} placeholder="https://..." data-testid="input-logo-url" />
-            </div>
-          </div>
-          <Button onClick={() => save(form)} disabled={isPending} className="rounded-2xl gap-2" data-testid="button-save-company">
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Salvar Dados da Empresa
-          </Button>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-// ─── Bank Details Section ─────────────────────────────────────────────────────
-
-function BankDetailsSection() {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const { data: details, isLoading } = useQuery<BankDetails | null>({ queryKey: ["/api/bank-details"] });
-
-  const [form, setForm] = useState({
-    accountHolder: "", bankName: "", iban: "", bic: "", paymentNote: "",
-  });
-
-  useEffect(() => {
-    if (details) {
-      setForm({
-        accountHolder: details.accountHolder ?? "",
-        bankName: details.bankName ?? "",
-        iban: details.iban ?? "",
-        bic: details.bic ?? "",
-        paymentNote: details.paymentNote ?? "",
-      });
-    }
-  }, [details]);
-
-  const { mutate: save, isPending } = useMutation({
-    mutationFn: async (data: typeof form) => {
-      const res = await fetch("/api/bank-details", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        credentials: "include", body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error();
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/bank-details"] });
-      toast({ title: "Dados bancários salvos!" });
-    },
-    onError: () => toast({ title: "Erro ao salvar", variant: "destructive" }),
-  });
-
-  const inputCls = "w-full p-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
-  const labelCls = "text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 block";
-
-  return (
-    <Card className="p-8 rounded-3xl border-border/50 shadow-sm">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2.5 bg-emerald-500/10 rounded-2xl text-emerald-600 dark:text-emerald-400"><Banknote className="w-5 h-5" /></div>
-        <div>
-          <h2 className="text-xl font-display font-bold">Dados de Pagamento</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Aparecem no final da fatura com as instruções de transferência.</p>
-        </div>
-      </div>
-      {isLoading ? <div className="text-muted-foreground text-sm">Carregando...</div> : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Nome do Titular</label>
-              <input className={inputCls} value={form.accountHolder} onChange={e => setForm(f => ({ ...f, accountHolder: e.target.value }))} placeholder="SGS Group Ltd" data-testid="input-account-holder" />
-            </div>
-            <div>
-              <label className={labelCls}>Nome do Banco</label>
-              <input className={inputCls} value={form.bankName} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} placeholder="AIB / Bank of Ireland..." data-testid="input-bank-name" />
-            </div>
-            <div>
-              <label className={labelCls}>IBAN</label>
-              <input className={`${inputCls} font-mono tracking-wider`} value={form.iban} onChange={e => setForm(f => ({ ...f, iban: e.target.value }))} placeholder="IE29 AIBK 9311 5212 3456 78" data-testid="input-iban" />
-            </div>
-            <div>
-              <label className={labelCls}>BIC / SWIFT</label>
-              <input className={`${inputCls} font-mono`} value={form.bic} onChange={e => setForm(f => ({ ...f, bic: e.target.value }))} placeholder="AIBKIE2D" data-testid="input-bic" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className={labelCls}>Observação de Pagamento (opcional)</label>
-              <textarea className={`${inputCls} resize-none`} rows={2} value={form.paymentNote} onChange={e => setForm(f => ({ ...f, paymentNote: e.target.value }))} placeholder="Ex: Please use the invoice number as payment reference." data-testid="input-payment-note" />
-            </div>
-          </div>
-          <Button onClick={() => save(form)} disabled={isPending} className="rounded-2xl gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="button-save-bank">
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Salvar Dados Bancários
-          </Button>
-        </div>
-      )}
     </Card>
   );
 }

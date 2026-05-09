@@ -9,6 +9,7 @@ import {
   Shield,
   LogOut,
   BarChart3,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUser } from "@/hooks/use-finance";
@@ -31,6 +32,7 @@ const BASE_NAV_ITEMS: { title: string; href: string; icon: typeof LayoutDashboar
   { title: "Pagamentos", href: "/pagamentos", icon: CreditCard },
   { title: "Dívidas", href: "/dividas", icon: Shield },
   { title: "Resultados", href: "/resultados", icon: BarChart3, businessOnly: true },
+  { title: "Faturas", href: "/faturas", icon: FileText },
   { title: "Educação", href: "/educacao", icon: BookOpen },
   { title: "Planos & Pagamento", href: "/planos", icon: Sparkles, highlight: true },
 ];

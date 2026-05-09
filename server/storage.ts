@@ -2,6 +2,7 @@ import { db } from "./db";
 import {
   users, accounts, transactions, transactionAllocations, commitments, debts,
   businessSettings, fixedCosts,
+  companyProfile, bankDetails, invoices, invoiceItems,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Transaction, type InsertTransaction,
@@ -9,6 +10,11 @@ import {
   type Debt, type InsertDebt,
   type BusinessSettings, type InsertBusinessSettings,
   type FixedCost, type InsertFixedCost,
+  type CompanyProfile, type InsertCompanyProfile,
+  type BankDetails, type InsertBankDetails,
+  type Invoice, type InsertInvoice,
+  type InvoiceItem, type InsertInvoiceItem,
+  type InvoiceWithItems,
   type UpdateAccountPercentagesRequest,
   type DistributeIncomeRequest
 } from "@shared/schema";
@@ -151,6 +157,16 @@ export interface IStorage {
   createFixedCost(data: InsertFixedCost): Promise<FixedCost>;
   updateFixedCost(userId: number, id: number, data: Partial<FixedCost>): Promise<FixedCost>;
   deleteFixedCost(userId: number, id: number): Promise<void>;
+  // Invoice module
+  getCompanyProfile(userId: number): Promise<CompanyProfile | null>;
+  upsertCompanyProfile(userId: number, data: Partial<Omit<CompanyProfile, 'id' | 'userId'>>): Promise<CompanyProfile>;
+  getBankDetails(userId: number): Promise<BankDetails | null>;
+  upsertBankDetails(userId: number, data: Partial<Omit<BankDetails, 'id' | 'userId'>>): Promise<BankDetails>;
+  getInvoices(userId: number): Promise<Invoice[]>;
+  getInvoiceWithItems(userId: number, id: number): Promise<InvoiceWithItems | null>;
+  createInvoice(userId: number, data: Omit<InsertInvoice, 'userId'>, items: Omit<InsertInvoiceItem, 'invoiceId'>[]): Promise<InvoiceWithItems>;
+  updateInvoice(userId: number, id: number, data: Partial<Omit<InsertInvoice, 'userId'>>, items?: Omit<InsertInvoiceItem, 'invoiceId'>[]): Promise<InvoiceWithItems>;
+  deleteInvoice(userId: number, id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -575,6 +591,83 @@ export class DatabaseStorage implements IStorage {
       `
     );
     return result.rows;
+  }
+
+  // ── Invoice Module ──────────────────────────────────────────────────────────
+
+  async getCompanyProfile(userId: number): Promise<CompanyProfile | null> {
+    const [row] = await db.select().from(companyProfile).where(eq(companyProfile.userId, userId));
+    return row ?? null;
+  }
+
+  async upsertCompanyProfile(userId: number, data: Partial<Omit<CompanyProfile, 'id' | 'userId'>>): Promise<CompanyProfile> {
+    const existing = await this.getCompanyProfile(userId);
+    if (existing) {
+      const [updated] = await db.update(companyProfile).set(data).where(eq(companyProfile.userId, userId)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(companyProfile).values({ userId, ...data } as any).returning();
+    return created;
+  }
+
+  async getBankDetails(userId: number): Promise<BankDetails | null> {
+    const [row] = await db.select().from(bankDetails).where(eq(bankDetails.userId, userId));
+    return row ?? null;
+  }
+
+  async upsertBankDetails(userId: number, data: Partial<Omit<BankDetails, 'id' | 'userId'>>): Promise<BankDetails> {
+    const existing = await this.getBankDetails(userId);
+    if (existing) {
+      const [updated] = await db.update(bankDetails).set(data).where(eq(bankDetails.userId, userId)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(bankDetails).values({ userId, ...data } as any).returning();
+    return created;
+  }
+
+  async getInvoices(userId: number): Promise<Invoice[]> {
+    return db.select().from(invoices).where(eq(invoices.userId, userId)).orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoiceWithItems(userId: number, id: number): Promise<InvoiceWithItems | null> {
+    const [inv] = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.userId, userId)));
+    if (!inv) return null;
+    const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id)).orderBy(asc(invoiceItems.position));
+    return { ...inv, items };
+  }
+
+  async createInvoice(userId: number, data: Omit<InsertInvoice, 'userId'>, items: Omit<InsertInvoiceItem, 'invoiceId'>[]): Promise<InvoiceWithItems> {
+    const [inv] = await db.insert(invoices).values({ ...data, userId } as any).returning();
+    let savedItems: InvoiceItem[] = [];
+    if (items.length > 0) {
+      savedItems = await db.insert(invoiceItems).values(items.map((item, i) => ({ ...item, invoiceId: inv.id, position: i }))).returning();
+    }
+    return { ...inv, items: savedItems };
+  }
+
+  async updateInvoice(userId: number, id: number, data: Partial<Omit<InsertInvoice, 'userId'>>, items?: Omit<InsertInvoiceItem, 'invoiceId'>[]): Promise<InvoiceWithItems> {
+    const [existing] = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.userId, userId)));
+    if (!existing) throw new Error("Fatura não encontrada");
+    const [updated] = await db.update(invoices).set(data as any).where(eq(invoices.id, id)).returning();
+    let savedItems: InvoiceItem[];
+    if (items !== undefined) {
+      await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+      if (items.length > 0) {
+        savedItems = await db.insert(invoiceItems).values(items.map((item, i) => ({ ...item, invoiceId: id, position: i }))).returning();
+      } else {
+        savedItems = [];
+      }
+    } else {
+      savedItems = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id)).orderBy(asc(invoiceItems.position));
+    }
+    return { ...updated, items: savedItems };
+  }
+
+  async deleteInvoice(userId: number, id: number): Promise<void> {
+    const [existing] = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.userId, userId)));
+    if (!existing) throw new Error("Fatura não encontrada");
+    await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+    await db.delete(invoices).where(eq(invoices.id, id));
   }
 }
 

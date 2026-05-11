@@ -90,6 +90,15 @@ export default function Settings() {
   const currentTotal = Math.round(localValues.reduce((sum, v) => sum + v.percentage, 0) * 100) / 100;
   const isValid = currentTotal === 100;
 
+  const formatBalance = (cents: number) => {
+    const currency = user?.currency || "EUR";
+    return new Intl.NumberFormat(currency === "BRL" ? "pt-BR" : "en-IE", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+    }).format(cents / 100);
+  };
+
   const handleSavePercentages = () => {
     if (!isValid) return;
     updatePercentages(
@@ -244,14 +253,29 @@ export default function Settings() {
                         <Button size="sm" onClick={() => handleRenameAccount(account.id)}>OK</Button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 group">
-                        <span className="font-semibold text-lg">{account.name}</span>
-                        <button 
-                          onClick={() => { setEditingAccountId(account.id); setEditName(account.name); }}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-all"
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2 group">
+                          <span className="font-semibold text-lg">{account.name}</span>
+                          <button
+                            onClick={() => { setEditingAccountId(account.id); setEditName(account.name); }}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-all"
+                            data-testid={`button-rename-account-${account.id}`}
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
+                        </div>
+                        <span
+                          className={`text-xs font-medium tabular-nums ${
+                            account.balance > 0
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : account.balance < 0
+                              ? "text-red-500 dark:text-red-400"
+                              : "text-muted-foreground"
+                          }`}
+                          data-testid={`text-balance-${account.id}`}
                         >
-                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                        </button>
+                          Saldo atual: {formatBalance(account.balance)}
+                        </span>
                       </div>
                     )}
                   </div>

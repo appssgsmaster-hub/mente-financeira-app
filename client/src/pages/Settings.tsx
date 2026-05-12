@@ -27,6 +27,7 @@ export default function Settings() {
   // Edit Account States
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   // Tracks raw typed strings for percentage inputs so "24." doesn't snap back
@@ -136,20 +137,47 @@ export default function Settings() {
     }
   };
 
-  const handleRenameAccount = async (id: number) => {
-    if (!editName) return;
+  const handleSaveAccountEdit = async (id: number) => {
+    if (!editName.trim()) return;
     try {
       const res = await fetch(`/api/accounts/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName }),
+        body: JSON.stringify({ name: editName.trim(), description: editDescription.trim() || null }),
       });
       if (!res.ok) throw new Error();
-      toast({ title: "Conta Atualizada", description: "Nome da conta alterado com sucesso." });
+      toast({ title: "Conta Atualizada", description: "Nome e descrição atualizados com sucesso." });
       setEditingAccountId(null);
       queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
     } catch (e) {
-      toast({ title: "Erro", description: "Não foi possível renomear a conta.", variant: "destructive" });
+      toast({ title: "Erro", description: "Não foi possível atualizar a conta.", variant: "destructive" });
+    }
+  };
+
+  const DEFAULT_ACCOUNT_NAMES = [
+    "Vida Financeira PF",
+    "Conta Operacional",
+    "Taxas & Obrigações",
+    "Conta de Oportunidades",
+    "Lucro / Doação",
+    "Reserva / Estabilidade",
+  ];
+
+  const handleRestoreDefaultNames = async () => {
+    if (!accounts) return;
+    if (!confirm("Restaurar os nomes padrão do Mente Financeira para as suas contas? Apenas os nomes serão alterados, os saldos e histórico serão mantidos.")) return;
+    try {
+      for (let i = 0; i < Math.min(accounts.length, DEFAULT_ACCOUNT_NAMES.length); i++) {
+        await fetch(`/api/accounts/${accounts[i].id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: DEFAULT_ACCOUNT_NAMES[i] }),
+        });
+      }
+      toast({ title: "Nomes restaurados!", description: "As contas voltaram aos nomes padrão do Mente Financeira." });
+      queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível restaurar os nomes.", variant: "destructive" });
     }
   };
 
@@ -187,14 +215,24 @@ export default function Settings() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      <div className="flex justify-between items-end">
+      <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground mb-2">Ajustes da Mente Financeira</h1>
           <p className="text-muted-foreground">Personalize suas contas e a distribuição do seu ecossistema.</p>
         </div>
-        <Button onClick={handleAddAccount} className="rounded-2xl gap-2 bg-secondary hover:bg-secondary/90">
-          <Plus className="w-4 h-4" /> Adicionar Conta
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={handleRestoreDefaultNames}
+            className="rounded-2xl gap-2 text-sm"
+            data-testid="button-restore-default-names"
+          >
+            <RefreshCw className="w-4 h-4" /> Restaurar nomes padrão
+          </Button>
+          <Button onClick={handleAddAccount} className="rounded-2xl gap-2 bg-secondary hover:bg-secondary/90">
+            <Plus className="w-4 h-4" /> Adicionar Conta
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6 rounded-3xl border-border/50 shadow-sm flex items-center justify-between">
@@ -242,22 +280,34 @@ export default function Settings() {
                   <div className="flex items-center gap-3 flex-1">
                     <div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: account.color }} />
                     {isEditing ? (
-                      <div className="flex gap-2 flex-1 max-w-xs">
-                        <input
-                          autoFocus
-                          className="flex-1 p-1 px-2 text-sm border rounded-lg bg-background"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleRenameAccount(account.id)}
+                      <div className="flex flex-col gap-2 flex-1 max-w-sm">
+                        <div className="flex gap-2">
+                          <input
+                            autoFocus
+                            placeholder="Nome da conta"
+                            className="flex-1 p-1.5 px-3 text-sm border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSaveAccountEdit(account.id)}
+                            data-testid={`input-edit-name-${account.id}`}
+                          />
+                          <Button size="sm" className="rounded-xl" onClick={() => handleSaveAccountEdit(account.id)}>OK</Button>
+                        </div>
+                        <textarea
+                          rows={2}
+                          placeholder="Descrição e propósito desta conta (opcional)..."
+                          className="w-full p-2 px-3 text-sm border rounded-xl bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          data-testid={`input-edit-description-${account.id}`}
                         />
-                        <Button size="sm" onClick={() => handleRenameAccount(account.id)}>OK</Button>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-2 group">
                           <span className="font-semibold text-lg">{account.name}</span>
                           <button
-                            onClick={() => { setEditingAccountId(account.id); setEditName(account.name); }}
+                            onClick={() => { setEditingAccountId(account.id); setEditName(account.name); setEditDescription(account.description ?? ""); }}
                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-all"
                             data-testid={`button-rename-account-${account.id}`}
                           >
@@ -276,6 +326,11 @@ export default function Settings() {
                         >
                           Saldo atual: {formatBalance(account.balance)}
                         </span>
+                        {account.description && (
+                          <p className="text-xs text-muted-foreground/80 mt-0.5 max-w-xs leading-relaxed">
+                            {account.description}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -369,89 +424,20 @@ export default function Settings() {
   );
 }
 
-const ACCOUNT_GUIDE = [
-  {
-    icon: Wallet,
-    color: "text-violet-600 dark:text-violet-400",
-    bg: "bg-violet-50 dark:bg-violet-950/30",
-    border: "border-violet-200 dark:border-violet-800",
-    name: "Pro-labore",
-    tagline: "O salário do dono",
-    items: [
-      "É o valor destinado ao pagamento do dono ou sócio da empresa.",
-      "Serve para separar o dinheiro pessoal do dinheiro da empresa.",
-      "Deve cobrir despesas pessoais do empreendedor: moradia, alimentação, transporte e vida pessoal.",
-      "Importância: evita que o dono retire dinheiro aleatoriamente do negócio, comprometendo o fluxo de caixa.",
-    ],
-  },
-  {
-    icon: Landmark,
-    color: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-50 dark:bg-blue-950/30",
-    border: "border-blue-200 dark:border-blue-800",
-    name: "Operacional",
-    tagline: "O motor do dia a dia",
-    items: [
-      "É a conta usada para manter o negócio funcionando no dia a dia.",
-      "Deve pagar fornecedores, ingredientes, mercadorias, embalagens, aluguel, energia, internet, salários e custos fixos.",
-      "Importância: garante que a empresa tenha dinheiro para operar sem depender de improviso ou misturar caixas.",
-    ],
-  },
-  {
-    icon: ShieldCheck,
-    color: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-50 dark:bg-amber-950/30",
-    border: "border-amber-200 dark:border-amber-800",
-    name: "Taxas e Obrigações",
-    tagline: "Fiscal em dia, empresa segura",
-    items: [
-      "É a conta destinada a impostos, taxas, VAT, PAYE, contabilidade, Revenue, licenças e obrigações legais.",
-      "Importância: evita sustos quando chega o momento de pagar impostos ou responsabilidades fiscais — o dinheiro já estará reservado.",
-    ],
-  },
-  {
-    icon: ShieldCheck,
-    color: "text-emerald-600 dark:text-emerald-400",
-    bg: "bg-emerald-50 dark:bg-emerald-950/30",
-    border: "border-emerald-200 dark:border-emerald-800",
-    name: "Reserva",
-    tagline: "O fundo de emergência",
-    items: [
-      "É a conta de segurança da empresa.",
-      "Deve ser usada para emergências, meses fracos, manutenção inesperada, consertos e imprevistos.",
-      "Importância: protege o negócio em períodos difíceis sem precisar recorrer a empréstimos ou comprometer outras contas.",
-    ],
-  },
-  {
-    icon: Rocket,
-    color: "text-orange-600 dark:text-orange-400",
-    bg: "bg-orange-50 dark:bg-orange-950/30",
-    border: "border-orange-200 dark:border-orange-800",
-    name: "Oportunidades",
-    tagline: "O motor do crescimento",
-    items: [
-      "É a conta destinada ao crescimento planejado da empresa.",
-      "Pode ser usada para comprar equipamentos, investir em marketing, melhorar o espaço, fazer cursos, contratar ajuda ou expandir o negócio.",
-      "Importância: ajuda a empresa crescer com planejamento, sem comprometer o dinheiro das despesas essenciais.",
-    ],
-  },
-  {
-    icon: TrendingUp,
-    color: "text-secondary",
-    bg: "bg-secondary/5",
-    border: "border-secondary/20",
-    name: "Lucro",
-    tagline: "O resultado do trabalho",
-    items: [
-      "É a conta que mostra o resultado positivo do negócio.",
-      "Pode ser usada para distribuição de lucro entre sócios, reinvestimento ou acumulação para metas futuras.",
-      "Importância: ajuda o empreendedor enxergar se o negócio realmente está gerando retorno financeiro real.",
-    ],
-  },
+const GUIDE_THEMES = [
+  { icon: Wallet,     color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/30",  border: "border-violet-200 dark:border-violet-800",  dot: "bg-violet-500" },
+  { icon: Landmark,   color: "text-blue-600 dark:text-blue-400",     bg: "bg-blue-50 dark:bg-blue-950/30",      border: "border-blue-200 dark:border-blue-800",      dot: "bg-blue-500" },
+  { icon: ShieldCheck,color: "text-amber-600 dark:text-amber-400",   bg: "bg-amber-50 dark:bg-amber-950/30",    border: "border-amber-200 dark:border-amber-800",    dot: "bg-amber-500" },
+  { icon: ShieldCheck,color: "text-emerald-600 dark:text-emerald-400",bg: "bg-emerald-50 dark:bg-emerald-950/30",border:"border-emerald-200 dark:border-emerald-800",  dot: "bg-emerald-500" },
+  { icon: Rocket,     color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-950/30", border: "border-orange-200 dark:border-orange-800",  dot: "bg-orange-500" },
+  { icon: TrendingUp, color: "text-secondary",                       bg: "bg-secondary/5",                      border: "border-secondary/20",                       dot: "bg-secondary" },
 ];
 
 function AccountGuideSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const { data: accounts } = useAccounts();
+
+  if (!accounts || accounts.length === 0) return null;
 
   return (
     <Card className="p-8 rounded-3xl border-border/50 shadow-sm">
@@ -461,19 +447,23 @@ function AccountGuideSection() {
         </div>
         <div>
           <h2 className="text-xl font-display font-bold text-foreground">Entenda suas contas</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Descubra o propósito de cada conta do método Mente Financeira.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Propósito de cada conta — edite o lápis acima para personalizar nome e descrição.
+          </p>
         </div>
       </div>
 
       <div className="space-y-3">
-        {ACCOUNT_GUIDE.map((account, idx) => {
-          const Icon = account.icon;
+        {accounts.map((account, idx) => {
+          const theme = GUIDE_THEMES[idx % GUIDE_THEMES.length];
+          const Icon = theme.icon;
           const isOpen = openIndex === idx;
+          const hasDescription = !!account.description;
 
           return (
             <div
-              key={account.name}
-              className={`rounded-2xl border transition-all duration-200 overflow-hidden ${isOpen ? `${account.border} ${account.bg}` : "border-border/40 hover:border-border/70 bg-background"}`}
+              key={account.id}
+              className={`rounded-2xl border transition-all duration-200 overflow-hidden ${isOpen ? `${theme.border} ${theme.bg}` : "border-border/40 hover:border-border/70 bg-background"}`}
               data-testid={`accordion-account-${idx}`}
             >
               <button
@@ -481,13 +471,20 @@ function AccountGuideSection() {
                 className="w-full flex items-center justify-between p-4 sm:p-5 text-left gap-3"
                 data-testid={`button-account-guide-${idx}`}
               >
-                <div className="flex items-center gap-3.5">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isOpen ? account.bg : "bg-muted"} border ${isOpen ? account.border : "border-border/30"}`}>
-                    <Icon className={`w-4.5 h-4.5 ${isOpen ? account.color : "text-muted-foreground"}`} style={{ width: 18, height: 18 }} />
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border transition-colors ${isOpen ? `${theme.bg} ${theme.border}` : "bg-muted border-border/30"}`}
+                  >
+                    <Icon className={`${isOpen ? theme.color : "text-muted-foreground"}`} style={{ width: 18, height: 18 }} />
                   </div>
-                  <div className="min-w-0">
-                    <p className={`font-bold text-sm sm:text-base leading-tight ${isOpen ? "text-foreground" : "text-foreground"}`}>{account.name}</p>
-                    <p className={`text-xs mt-0.5 ${isOpen ? "text-muted-foreground" : "text-muted-foreground/70"}`}>{account.tagline}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-sm sm:text-base leading-tight truncate">{account.name}</p>
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: account.color }} />
+                    </div>
+                    <p className="text-xs mt-0.5 text-muted-foreground/70 truncate">
+                      {account.percentage}% do ecossistema
+                    </p>
                   </div>
                 </div>
                 <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
@@ -495,14 +492,13 @@ function AccountGuideSection() {
 
               {isOpen && (
                 <div className="px-5 pb-5 pt-1">
-                  <ul className="space-y-2.5">
-                    {account.items.map((item, i) => (
-                      <li key={i} className="flex items-start gap-2.5">
-                        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${account.color.replace("text-", "bg-")}`} />
-                        <p className="text-sm text-foreground/80 leading-relaxed">{item}</p>
-                      </li>
-                    ))}
-                  </ul>
+                  {hasDescription ? (
+                    <p className="text-sm text-foreground/80 leading-relaxed">{account.description}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">
+                      Nenhuma descrição definida. Clique no <strong>lápis</strong> ao lado do nome da conta acima para personalizar o propósito desta conta.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

@@ -25,6 +25,7 @@ export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   name: text("name").notNull(),
+  description: text("description"),
   percentage: real("percentage").notNull(),
   balance: integer("balance").notNull().default(0),
   color: text("color").notNull(),

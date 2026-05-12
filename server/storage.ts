@@ -196,12 +196,12 @@ export class DatabaseStorage implements IStorage {
 
   async seedDefaultAccounts(userId: number): Promise<void> {
     const initialAccounts = [
-      { name: "Vida Financeira PF", percentage: 50, color: "#4F46E5", userId, balance: 0 },
-      { name: "Conta Operacional", percentage: 10, color: "#22C55E", userId, balance: 0 },
-      { name: "Taxas & Obrigações", percentage: 10, color: "#EF4444", userId, balance: 0 },
-      { name: "Conta de Oportunidades", percentage: 10, color: "#F59E0B", userId, balance: 0 },
-      { name: "Lucro / Doação", percentage: 10, color: "#8B5CF6", userId, balance: 0 },
-      { name: "Reserva / Estabilidade", percentage: 10, color: "#06B6D4", userId, balance: 0 },
+      { name: "Vida Financeira PF", description: "Destinada às despesas pessoais do titular: moradia, alimentação, transporte, lazer e qualidade de vida.", percentage: 50, color: "#4F46E5", userId, balance: 0 },
+      { name: "Conta Operacional", description: "Usada para manter o negócio ou rotina funcionando: contas fixas, fornecedores, serviços e despesas do dia a dia.", percentage: 10, color: "#22C55E", userId, balance: 0 },
+      { name: "Taxas & Obrigações", description: "Reserva para impostos, taxas, obrigações fiscais e qualquer compromisso legal ou contábil.", percentage: 10, color: "#EF4444", userId, balance: 0 },
+      { name: "Conta de Oportunidades", description: "Destinada a crescimento: investimentos, cursos, equipamentos, expansão e novas possibilidades.", percentage: 10, color: "#F59E0B", userId, balance: 0 },
+      { name: "Lucro / Doação", description: "O resultado positivo do trabalho. Pode ser distribuído, reinvestido ou destinado a causas que importam.", percentage: 10, color: "#8B5CF6", userId, balance: 0 },
+      { name: "Reserva / Estabilidade", description: "Fundo de emergência para imprevistos, meses difíceis e manutenção da estabilidade financeira.", percentage: 10, color: "#06B6D4", userId, balance: 0 },
     ];
     await db.insert(accounts).values(initialAccounts);
   }

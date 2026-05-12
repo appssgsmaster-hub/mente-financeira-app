@@ -11,7 +11,7 @@ import { api } from "@shared/routes";
 
 export default function Settings() {
   const { data: user } = useUser();
-  const { data: accounts, isLoading } = useAccounts();
+  const { data: accounts, isLoading, isError, refetch } = useAccounts();
   const { mutate: updatePercentages, isPending } =
     useUpdateAccountPercentages();
   const { toast } = useToast();
@@ -204,6 +204,21 @@ export default function Settings() {
         toast({ title: "Erro", description: "Não foi possível resetar os dados.", variant: "destructive" });
       });
   };
+
+  if (isError) {
+    return (
+      <div className="flex flex-col h-64 items-center justify-center gap-4 text-center px-6">
+        <AlertCircle className="w-10 h-10 text-destructive" />
+        <div>
+          <p className="font-semibold text-foreground">Não foi possível carregar as contas</p>
+          <p className="text-sm text-muted-foreground mt-1">Pode ser um problema temporário de conexão. Tente novamente.</p>
+        </div>
+        <Button onClick={() => refetch()} className="rounded-2xl gap-2">
+          <RefreshCw className="w-4 h-4" /> Tentar novamente
+        </Button>
+      </div>
+    );
+  }
 
   if (isLoading || !accounts) {
     return (

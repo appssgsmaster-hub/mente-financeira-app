@@ -109,9 +109,29 @@ app.use(
 
 let initPromise: Promise<void> | null = null;
 
+async function runStartupMigrations(): Promise<void> {
+  if (!dbPool) return;
+  const migrations = [
+    // Added 2025 — account_type for multi-mode users
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'personal'`,
+    // Added 2025 — per-account custom description
+    `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS description TEXT`,
+  ];
+  for (const sql of migrations) {
+    try {
+      await dbPool.query(sql);
+    } catch (err: any) {
+      // Non-fatal — log and continue so the server still starts
+      console.warn("[vercel] startup migration skipped:", err.message);
+    }
+  }
+  console.log("[vercel] startup migrations complete");
+}
+
 function ensureInitialized(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
+      await runStartupMigrations();
       const httpServer = createServer(app);
       await registerRoutes(httpServer, app);
       app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

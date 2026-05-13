@@ -1,10 +1,10 @@
-import { ReactNode, useMemo, useState, useEffect } from "react";
+import { ReactNode, useMemo } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/hooks/use-auth";
-import { useAccounts, useTransactions, useCommitments } from "@/hooks/use-finance";
+import { useAccounts, useTransactions, useCommitments, useUser } from "@/hooks/use-finance";
 import { getMentorMessage } from "@/lib/mentor-messages";
-import { User as UserIcon, LogOut, Sparkles } from "lucide-react";
+import { User as UserIcon, LogOut, Sparkles, User, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -15,11 +15,31 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const MODE_BADGE = {
+  personal: {
+    label: "Conta Pessoal",
+    shortLabel: "Pessoal",
+    icon: User,
+    className: "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800/60",
+  },
+  business: {
+    label: "Conta Empresarial",
+    shortLabel: "Empresarial",
+    icon: Building2,
+    className: "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60",
+  },
+};
+
 export function MainLayout({ children }: { children: ReactNode }) {
   const { user, isLoading, logout } = useAuth();
+  const { data: finUser } = useUser();
   const { data: accounts } = useAccounts();
   const { data: transactions } = useTransactions();
   const { data: commitments = [] } = useCommitments();
+
+  const accountType = (finUser?.accountType as "personal" | "business") || "personal";
+  const modeBadge = MODE_BADGE[accountType];
+  const ModeBadgeIcon = modeBadge.icon;
 
   const style = {
     "--sidebar-width": "18rem",
@@ -96,6 +116,13 @@ export function MainLayout({ children }: { children: ReactNode }) {
                     <Sparkles className="w-3.5 h-3.5 inline-block mr-1.5 text-primary/60 -translate-y-px" />
                     <span className="italic">{mentorMessage}</span>
                   </p>
+                  <span
+                    className={`hidden sm:inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full font-semibold ${modeBadge.className}`}
+                    data-testid="badge-account-mode"
+                  >
+                    <ModeBadgeIcon className="w-3 h-3 shrink-0" />
+                    {modeBadge.shortLabel}
+                  </span>
                   {trialDays !== null && (
                     <span className="text-[10px] sm:text-xs bg-secondary/10 text-secondary px-2 sm:px-2.5 py-0.5 rounded-full font-semibold" data-testid="text-trial-badge">
                       {trialDays}d teste

@@ -398,6 +398,32 @@ export function useDeleteFixedCost() {
 }
 
 // ---------------------------------------------------------------------------
+// Switch account type (personal ↔ business) — invalidates everything
+// ---------------------------------------------------------------------------
+
+export function useSwitchAccountType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (accountType: "personal" | "business") =>
+      apiFetch("/api/user", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountType }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/user"] });
+      qc.invalidateQueries({ queryKey: ["/api/accounts"] });
+      qc.invalidateQueries({ queryKey: ["/api/transactions"] });
+      qc.invalidateQueries({ queryKey: ["/api/commitments"] });
+      qc.invalidateQueries({ queryKey: ["/api/debts"] });
+      qc.invalidateQueries({ queryKey: ["/api/expense-categories"] });
+      qc.invalidateQueries({ queryKey: ["/api/business-settings"] });
+      qc.invalidateQueries({ queryKey: ["/api/fixed-costs"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Expense Categories
 // ---------------------------------------------------------------------------
 

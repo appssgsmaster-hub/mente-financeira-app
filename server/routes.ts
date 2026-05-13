@@ -724,5 +724,68 @@ export async function registerRoutes(
     }
   });
 
+  // ── Expense Categories ─────────────────────────────────────────────────────
+  app.get("/api/expense-categories", requireAuth, async (req, res) => {
+    try {
+      const accountType = (req.query["accountType"] as string) || "personal";
+      const cats = await storage.getExpenseCategories(req.session.userId!, accountType);
+      res.json(cats);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar categorias" });
+    }
+  });
+
+  app.post("/api/expense-categories", requireAuth, async (req, res) => {
+    try {
+      const { name, description, accountType } = req.body;
+      if (!name) return res.status(400).json({ message: "Nome é obrigatório" });
+      const cat = await storage.createExpenseCategory({
+        userId: req.session.userId!,
+        accountType: accountType || "personal",
+        name: String(name),
+        description: description ?? null,
+        sortOrder: 0,
+      });
+      res.status(201).json(cat);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao criar categoria" });
+    }
+  });
+
+  app.patch("/api/expense-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params["id"] as string);
+      const { name, description } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = String(name);
+      if (description !== undefined) updates.description = description;
+      const cat = await storage.updateExpenseCategory(req.session.userId!, id, updates);
+      res.json(cat);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar categoria" });
+    }
+  });
+
+  app.delete("/api/expense-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params["id"] as string);
+      await storage.deleteExpenseCategory(req.session.userId!, id);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao apagar categoria" });
+    }
+  });
+
+  app.post("/api/expense-categories/reorder", requireAuth, async (req, res) => {
+    try {
+      const { accountType, orderedIds } = req.body;
+      if (!Array.isArray(orderedIds)) return res.status(400).json({ message: "orderedIds deve ser um array" });
+      await storage.reorderExpenseCategories(req.session.userId!, accountType || "personal", orderedIds);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao reordenar categorias" });
+    }
+  });
+
   return httpServer;
 }

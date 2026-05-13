@@ -1,11 +1,15 @@
 import { useState, useEffect } from "react";
-import { useAccounts, useUpdateAccountPercentages, useUser } from "@/hooks/use-finance";
+import {
+  useAccounts, useUpdateAccountPercentages, useUser,
+  useExpenseCategories, useCreateExpenseCategory, useUpdateExpenseCategory,
+  useDeleteExpenseCategory, useReorderExpenseCategories,
+} from "@/hooks/use-finance";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil, RefreshCw, ChevronDown, BookOpen, Wallet, Landmark, ShieldCheck, Rocket, TrendingUp } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Globe, Plus, Trash2, Pencil, RefreshCw, ChevronDown, BookOpen, Wallet, Landmark, ShieldCheck, Rocket, TrendingUp, Tag, ChevronUp, Check, X } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 
@@ -430,12 +434,227 @@ export default function Settings() {
 
       <AccountGuideSection />
 
+      <ExpenseCategoriesSection accountType={user?.accountType || "personal"} />
+
       <Card className="p-6 rounded-3xl border-border/50 shadow-sm">
         <h3 className="text-lg font-bold mb-2">Resetar Ecossistema</h3>
         <p className="text-sm text-muted-foreground mb-4">Isso apaga todas as transações e zera os saldos das contas.</p>
         <Button variant="destructive" onClick={handleReset} className="rounded-2xl">Resetar Tudo</Button>
       </Card>
     </div>
+  );
+}
+
+function ExpenseCategoriesSection({ accountType }: { accountType: string }) {
+  const { toast } = useToast();
+  const { data: categories = [], isLoading } = useExpenseCategories(accountType);
+  const { mutate: createCat, isPending: isCreating } = useCreateExpenseCategory();
+  const { mutate: updateCat, isPending: isUpdating } = useUpdateExpenseCategory();
+  const { mutate: deleteCat } = useDeleteExpenseCategory();
+  const { mutate: reorder } = useReorderExpenseCategories();
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [addingNew, setAddingNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+
+  function startEdit(cat: any) {
+    setEditingId(cat.id);
+    setEditName(cat.name);
+    setEditDesc(cat.description || "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditName("");
+    setEditDesc("");
+  }
+
+  function saveEdit() {
+    if (!editingId || !editName.trim()) return;
+    updateCat({ id: editingId, data: { name: editName.trim(), description: editDesc.trim() || undefined } }, {
+      onSuccess: () => { toast({ title: "Categoria atualizada" }); cancelEdit(); },
+      onError: () => toast({ title: "Erro ao atualizar", variant: "destructive" }),
+    });
+  }
+
+  function handleDelete(id: number, name: string) {
+    if (!confirm(`Apagar a categoria "${name}"? Saídas existentes não serão afetadas.`)) return;
+    deleteCat(id, {
+      onSuccess: () => toast({ title: "Categoria removida" }),
+      onError: () => toast({ title: "Erro ao remover", variant: "destructive" }),
+    });
+  }
+
+  function handleAdd() {
+    if (!newName.trim()) return;
+    createCat({ name: newName.trim(), description: newDesc.trim() || undefined, accountType }, {
+      onSuccess: () => { toast({ title: "Categoria criada" }); setNewName(""); setNewDesc(""); setAddingNew(false); },
+      onError: () => toast({ title: "Erro ao criar", variant: "destructive" }),
+    });
+  }
+
+  function moveUp(idx: number) {
+    if (idx === 0) return;
+    const ids = categories.map((c: any) => c.id);
+    [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
+    reorder({ accountType, orderedIds: ids });
+  }
+
+  function moveDown(idx: number) {
+    if (idx >= categories.length - 1) return;
+    const ids = categories.map((c: any) => c.id);
+    [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+    reorder({ accountType, orderedIds: ids });
+  }
+
+  const modeLabel = accountType === "business" ? "Empresarial" : "Pessoal/Família";
+
+  return (
+    <Card className="p-8 rounded-3xl border-border/50 shadow-sm">
+      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-destructive/10 rounded-2xl text-destructive">
+            <Tag className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-display font-bold text-foreground">Categorias de Saídas</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Modo {modeLabel} — edite, reordene ou adicione categorias para as suas despesas.
+            </p>
+          </div>
+        </div>
+        <Button
+          onClick={() => setAddingNew(true)}
+          className="rounded-2xl gap-2 bg-destructive hover:bg-destructive/90 text-white"
+          disabled={addingNew}
+          data-testid="button-add-expense-category"
+        >
+          <Plus className="w-4 h-4" /> Nova Categoria
+        </Button>
+      </div>
+
+      {addingNew && (
+        <div className="mb-4 p-4 rounded-2xl border-2 border-destructive/30 bg-destructive/5 space-y-3">
+          <input
+            autoFocus
+            placeholder="Nome da categoria"
+            className="w-full p-3 rounded-xl border border-input bg-background text-sm"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAddingNew(false); setNewName(""); setNewDesc(""); } }}
+            data-testid="input-new-category-name"
+          />
+          <input
+            placeholder="Exemplos de despesas desta categoria (opcional)"
+            className="w-full p-3 rounded-xl border border-input bg-background text-sm"
+            value={newDesc}
+            onChange={e => setNewDesc(e.target.value)}
+            data-testid="input-new-category-desc"
+          />
+          <div className="flex gap-2">
+            <Button onClick={handleAdd} disabled={isCreating || !newName.trim()} className="rounded-xl gap-2 flex-1">
+              {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              Criar
+            </Button>
+            <Button variant="outline" onClick={() => { setAddingNew(false); setNewName(""); setNewDesc(""); }} className="rounded-xl gap-2 flex-1">
+              <X className="w-4 h-4" /> Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center py-8 text-primary"><Loader2 className="w-6 h-6 animate-spin" /></div>
+      ) : (
+        <div className="space-y-2">
+          {categories.map((cat: any, idx: number) => (
+            <div key={cat.id} className="rounded-2xl border border-border/40 hover:border-border/70 bg-background transition-all overflow-hidden" data-testid={`card-category-${cat.id}`}>
+              {editingId === cat.id ? (
+                <div className="p-4 space-y-3">
+                  <input
+                    autoFocus
+                    className="w-full p-2.5 rounded-xl border border-input bg-background text-sm font-medium"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") cancelEdit(); }}
+                    data-testid={`input-edit-category-name-${cat.id}`}
+                  />
+                  <input
+                    className="w-full p-2.5 rounded-xl border border-input bg-background text-sm text-muted-foreground"
+                    value={editDesc}
+                    onChange={e => setEditDesc(e.target.value)}
+                    placeholder="Exemplos de despesas (opcional)"
+                    data-testid={`input-edit-category-desc-${cat.id}`}
+                  />
+                  <div className="flex gap-2">
+                    <Button onClick={saveEdit} disabled={isUpdating || !editName.trim()} size="sm" className="rounded-xl gap-1.5 flex-1">
+                      {isUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      Salvar
+                    </Button>
+                    <Button onClick={cancelEdit} variant="outline" size="sm" className="rounded-xl gap-1.5 flex-1">
+                      <X className="w-3.5 h-3.5" /> Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-4">
+                  <div className="flex flex-col gap-0.5 shrink-0">
+                    <button
+                      onClick={() => moveUp(idx)}
+                      disabled={idx === 0}
+                      className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
+                      data-testid={`button-move-up-${cat.id}`}
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => moveDown(idx)}
+                      disabled={idx === categories.length - 1}
+                      className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
+                      data-testid={`button-move-down-${cat.id}`}
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm text-foreground truncate">{cat.name}</p>
+                    {cat.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{cat.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost" size="icon"
+                      className="rounded-xl h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={() => startEdit(cat)}
+                      data-testid={`button-edit-category-${cat.id}`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost" size="icon"
+                      className="rounded-xl h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDelete(cat.id, cat.name)}
+                      data-testid={`button-delete-category-${cat.id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {categories.length === 0 && !addingNew && (
+            <div className="py-10 text-center text-muted-foreground text-sm">
+              Nenhuma categoria ainda. Clique em "Nova Categoria" para começar.
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 

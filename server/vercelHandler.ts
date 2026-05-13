@@ -116,6 +116,16 @@ async function runStartupMigrations(): Promise<void> {
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'personal'`,
     // Added 2025 — per-account custom description
     `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS description TEXT`,
+    // Added 2025 — per-user expense categories
+    `CREATE TABLE IF NOT EXISTS expense_categories (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      account_type TEXT NOT NULL DEFAULT 'personal',
+      name TEXT NOT NULL,
+      description TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
   ];
   for (const sql of migrations) {
     try {

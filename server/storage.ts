@@ -1,7 +1,7 @@
 import { db } from "./db";
 import {
   users, accounts, transactions, transactionAllocations, commitments, debts,
-  businessSettings, fixedCosts,
+  businessSettings, fixedCosts, expenseCategories,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Transaction, type InsertTransaction,
@@ -9,10 +9,41 @@ import {
   type Debt, type InsertDebt,
   type BusinessSettings, type InsertBusinessSettings,
   type FixedCost, type InsertFixedCost,
+  type ExpenseCategory, type InsertExpenseCategory,
   type UpdateAccountPercentagesRequest,
   type DistributeIncomeRequest
 } from "@shared/schema";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
+
+const PERSONAL_DEFAULT_CATEGORIES = [
+  { name: "Lar & Segurança", description: "Aluguel, mortgage, condomínio, manutenção da casa" },
+  { name: "Energia & Conforto", description: "Eletricidade, gás, internet, telefone, bins" },
+  { name: "Nutrição & Abundância", description: "Mercado, comida, alimentação da casa" },
+  { name: "Saúde & Vitalidade", description: "Consultas, farmácia, exames, seguro saúde, terapias" },
+  { name: "Imagem & Presença", description: "Roupas, calçados, salão, cuidados pessoais" },
+  { name: "Movimento & Liberdade", description: "Combustível, transporte público, seguro do carro, manutenção, estacionamento" },
+  { name: "Crescimento & Conhecimento", description: "Cursos, livros, treinamentos, escola, mentorias" },
+  { name: "Família & Cuidado", description: "Filhos, netos, escola, presentes familiares, cuidados familiares" },
+  { name: "Experiências & Alegria", description: "Viagens, lazer, restaurantes, passeios, férias" },
+  { name: "Compromissos & Responsabilidade", description: "Dívidas, parcelas, cartões, acordos, financiamentos" },
+  { name: "Generosidade & Propósito", description: "Doações, igreja, ajuda familiar, causas sociais" },
+  { name: "Proteção & Reserva", description: "Emergências, seguros, reserva preventiva" },
+];
+
+const BUSINESS_DEFAULT_CATEGORIES = [
+  { name: "Infraestrutura & Espaço", description: "Aluguel de escritório, coworking, manutenção" },
+  { name: "Tecnologia & Sistemas", description: "Software, servidores, ferramentas digitais, domínios" },
+  { name: "Marketing & Vendas", description: "Publicidade, anúncios, materiais de marketing" },
+  { name: "Pessoal & RH", description: "Salários, benefícios, encargos trabalhistas" },
+  { name: "Operações & Logística", description: "Transporte, entregas, armazenamento, suprimentos" },
+  { name: "Finanças & Contabilidade", description: "Contabilidade, impostos, taxas bancárias, seguros" },
+  { name: "Crescimento & Capacitação", description: "Treinamentos, cursos, mentorias, conferências" },
+  { name: "Fornecedores & Compras", description: "Matéria-prima, estoque, insumos, terceirizados" },
+  { name: "Viagens & Representação", description: "Viagens de negócio, hospedagem, alimentação em viagem" },
+  { name: "Compromissos & Financiamentos", description: "Empréstimos, parcelas, financiamentos empresariais" },
+  { name: "Benefícios & Bem-estar", description: "Plano de saúde, vale-refeição, convênios" },
+  { name: "Reserva & Contingência", description: "Emergências, reserva operacional, seguros empresariais" },
+];
 
 function distributeWithLargestRemainder(
   amount: number,
@@ -151,6 +182,11 @@ export interface IStorage {
   createFixedCost(data: InsertFixedCost): Promise<FixedCost>;
   updateFixedCost(userId: number, id: number, data: Partial<FixedCost>): Promise<FixedCost>;
   deleteFixedCost(userId: number, id: number): Promise<void>;
+  getExpenseCategories(userId: number, accountType: string): Promise<ExpenseCategory[]>;
+  createExpenseCategory(data: InsertExpenseCategory): Promise<ExpenseCategory>;
+  updateExpenseCategory(userId: number, id: number, data: Partial<ExpenseCategory>): Promise<ExpenseCategory>;
+  deleteExpenseCategory(userId: number, id: number): Promise<void>;
+  reorderExpenseCategories(userId: number, accountType: string, orderedIds: number[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -552,6 +588,64 @@ export class DatabaseStorage implements IStorage {
     const [existing] = await db.select().from(fixedCosts).where(eq(fixedCosts.id, id));
     if (!existing || existing.userId !== userId) throw new Error("Custo fixo não encontrado");
     await db.delete(fixedCosts).where(eq(fixedCosts.id, id));
+  }
+
+  async getExpenseCategories(userId: number, accountType: string): Promise<ExpenseCategory[]> {
+    const cats = await db
+      .select()
+      .from(expenseCategories)
+      .where(and(eq(expenseCategories.userId, userId), eq(expenseCategories.accountType, accountType)))
+      .orderBy(asc(expenseCategories.sortOrder), asc(expenseCategories.id));
+
+    if (cats.length > 0) return cats;
+
+    // Auto-seed default categories for this user+mode on first access
+    const defaults = accountType === "personal" ? PERSONAL_DEFAULT_CATEGORIES : BUSINESS_DEFAULT_CATEGORIES;
+    const rows = defaults.map((d, i) => ({
+      userId,
+      accountType,
+      name: d.name,
+      description: d.description,
+      sortOrder: i,
+    }));
+    const inserted = await db.insert(expenseCategories).values(rows).returning();
+    return inserted;
+  }
+
+  async createExpenseCategory(data: InsertExpenseCategory): Promise<ExpenseCategory> {
+    const acctType = data.accountType ?? "personal";
+    const existing = await db
+      .select()
+      .from(expenseCategories)
+      .where(and(eq(expenseCategories.userId, data.userId), eq(expenseCategories.accountType, acctType)))
+      .orderBy(desc(expenseCategories.sortOrder))
+      .limit(1);
+    const nextOrder = existing.length > 0 ? (existing[0].sortOrder + 1) : 0;
+    const [row] = await db.insert(expenseCategories).values({ ...data, sortOrder: nextOrder }).returning();
+    return row;
+  }
+
+  async updateExpenseCategory(userId: number, id: number, data: Partial<ExpenseCategory>): Promise<ExpenseCategory> {
+    const [existing] = await db.select().from(expenseCategories).where(eq(expenseCategories.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Categoria não encontrada");
+    const { id: _id, userId: _uid, createdAt: _ca, ...safeData } = data as any;
+    const [updated] = await db.update(expenseCategories).set(safeData).where(eq(expenseCategories.id, id)).returning();
+    return updated;
+  }
+
+  async deleteExpenseCategory(userId: number, id: number): Promise<void> {
+    const [existing] = await db.select().from(expenseCategories).where(eq(expenseCategories.id, id));
+    if (!existing || existing.userId !== userId) throw new Error("Categoria não encontrada");
+    await db.delete(expenseCategories).where(eq(expenseCategories.id, id));
+  }
+
+  async reorderExpenseCategories(userId: number, accountType: string, orderedIds: number[]): Promise<void> {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db
+        .update(expenseCategories)
+        .set({ sortOrder: i })
+        .where(and(eq(expenseCategories.id, orderedIds[i]), eq(expenseCategories.userId, userId)));
+    }
   }
 
   async listStripeProductsWithPrices(): Promise<any[]> {

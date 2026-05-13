@@ -16,6 +16,7 @@ import {
   useUser,
   useCommitments,
   useUpdateCommitment,
+  useExpenseCategories,
 } from "@/hooks/use-finance";
 import type { Commitment } from "@shared/schema";
 
@@ -66,9 +67,13 @@ export default function Payments() {
     return map;
   }, [accounts]);
 
+  const accountType = user?.accountType || "personal";
+  const { data: expenseCategories = [] } = useExpenseCategories(accountType);
+
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [selectedAcc, setSelectedAcc] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [txDate, setTxDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [linkedCommitment, setLinkedCommitment] = useState<string>("");
 
@@ -204,7 +209,8 @@ export default function Payments() {
       type: "expense",
       accountId: Number(selectedAcc),
       isRecurring: false,
-      date: txDate
+      date: txDate,
+      category: selectedCategory || null,
     } as any, {
       onSuccess: () => {
         if (linkedCommitment) {
@@ -213,7 +219,7 @@ export default function Payments() {
         } else {
           toast({ title: "Sucesso", description: "Saída registrada com sucesso!" });
         }
-        setDesc(""); setAmount(""); setSelectedAcc(""); setTxDate(new Date().toISOString().split("T")[0]); setLinkedCommitment("");
+        setDesc(""); setAmount(""); setSelectedAcc(""); setSelectedCategory(""); setTxDate(new Date().toISOString().split("T")[0]); setLinkedCommitment("");
       }
     });
   }
@@ -329,15 +335,31 @@ export default function Payments() {
                 Ecossistema Total → distribuído automaticamente entre as contas
               </div>
             ) : (
-              <select
-                className="w-full p-3 rounded-2xl border border-input bg-background"
-                value={selectedAcc}
-                onChange={e => setSelectedAcc(e.target.value)}
-                data-testid="select-account"
-              >
-                <option value="">Selecione a conta (apenas para Saídas)</option>
-                {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              <>
+                <select
+                  className="w-full p-3 rounded-2xl border border-input bg-background"
+                  value={selectedAcc}
+                  onChange={e => setSelectedAcc(e.target.value)}
+                  data-testid="select-account"
+                >
+                  <option value="">Selecione a conta (apenas para Saídas)</option>
+                  {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Categoria da Despesa</label>
+                  <select
+                    className="w-full p-3 rounded-2xl border border-input bg-background text-sm"
+                    value={selectedCategory}
+                    onChange={e => setSelectedCategory(e.target.value)}
+                    data-testid="select-expense-category"
+                  >
+                    <option value="">Sem categoria</option>
+                    {expenseCategories.map((c: any) => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
             )}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <Button
@@ -477,6 +499,11 @@ export default function Payments() {
                           <div className="flex flex-col gap-0.5 mt-0.5">
                             <p className="text-xs text-muted-foreground">{format(new Date(tx.date), "dd/MM/yyyy", { locale: ptBR })}</p>
                             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider truncate">{accountName}</p>
+                            {tx.category ? (
+                              <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded-md bg-destructive/10 text-destructive text-[10px] font-medium truncate max-w-[160px]">{tx.category}</span>
+                            ) : (
+                              <span className="inline-block mt-0.5 text-[10px] text-muted-foreground/50 italic">Sem categoria</span>
+                            )}
                           </div>
                         </div>
                       </div>

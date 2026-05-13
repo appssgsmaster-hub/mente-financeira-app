@@ -396,3 +396,63 @@ export function useDeleteFixedCost() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/fixed-costs"] }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Expense Categories
+// ---------------------------------------------------------------------------
+
+export function useExpenseCategories(accountType: string) {
+  return useQuery<any[]>({
+    queryKey: ["/api/expense-categories", accountType],
+    queryFn: () => apiFetch(`/api/expense-categories?accountType=${accountType}`),
+    enabled: !!accountType,
+  });
+}
+
+export function useCreateExpenseCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; description?: string; accountType: string }) =>
+      apiFetch("/api/expense-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ["/api/expense-categories", vars.accountType] }),
+  });
+}
+
+export function useUpdateExpenseCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string } }) =>
+      apiFetch(`/api/expense-categories/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/expense-categories"] }),
+  });
+}
+
+export function useDeleteExpenseCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch(`/api/expense-categories/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/expense-categories"] }),
+  });
+}
+
+export function useReorderExpenseCategories() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ accountType, orderedIds }: { accountType: string; orderedIds: number[] }) =>
+      apiFetch("/api/expense-categories/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountType, orderedIds }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/expense-categories"] }),
+  });
+}

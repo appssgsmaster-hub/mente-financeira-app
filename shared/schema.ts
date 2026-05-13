@@ -93,6 +93,16 @@ export const fixedCosts = pgTable("fixed_costs", {
   category: text("category"),
 });
 
+export const expenseCategories = pgTable("expense_categories", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  accountType: text("account_type").notNull().default("personal"),
+  name: text("name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, trialStartDate: true });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true });
 export const insertTransactionSchema = createInsertSchema(transactions)
@@ -105,6 +115,7 @@ export const insertCommitmentSchema = createInsertSchema(commitments).omit({ id:
 export const insertDebtSchema = createInsertSchema(debts).omit({ id: true, createdAt: true });
 export const insertBusinessSettingsSchema = createInsertSchema(businessSettings).omit({ id: true });
 export const insertFixedCostSchema = createInsertSchema(fixedCosts).omit({ id: true });
+export const insertExpenseCategorySchema = createInsertSchema(expenseCategories).omit({ id: true, createdAt: true });
 
 export const registerSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -140,6 +151,9 @@ export type InsertBusinessSettings = z.infer<typeof insertBusinessSettingsSchema
 
 export type FixedCost = typeof fixedCosts.$inferSelect;
 export type InsertFixedCost = z.infer<typeof insertFixedCostSchema>;
+
+export type ExpenseCategory = typeof expenseCategories.$inferSelect;
+export type InsertExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
 
 export type UpdateAccountPercentagesRequest = {
   updates: { id: number; percentage: number }[];

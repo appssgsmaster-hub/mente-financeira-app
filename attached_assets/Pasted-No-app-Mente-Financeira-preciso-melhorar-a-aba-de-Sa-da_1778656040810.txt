@@ -1,0 +1,85 @@
+No app Mente Financeira, preciso melhorar a aba de Saídas, criando uma estrutura de categorias/subáreas para despesas pessoais/familiares.
+
+IMPORTANTE: não alterar a lógica principal do app, não quebrar os cálculos existentes, não alterar o dashboard, não alterar entradas, contas, projeções ou autenticação. Fazer somente o ajuste das categorias de Saídas e das configurações em Ajustes.
+
+OBJETIVO:
+Na aba de Saídas, ao registrar uma despesa, o usuário deve poder selecionar uma categoria/subárea da despesa.
+
+Criar categorias iniciais padrão para o modo pessoal/família:
+
+1. Lar & Segurança
+   Exemplos: aluguel, mortgage, condomínio, manutenção da casa
+
+2. Energia & Conforto
+   Exemplos: eletricidade, gás, internet, telefone, bins
+
+3. Nutrição & Abundância
+   Exemplos: mercado, comida, alimentação da casa
+
+4. Saúde & Vitalidade
+   Exemplos: consultas, farmácia, exames, seguro saúde, terapias
+
+5. Imagem & Presença
+   Exemplos: roupas, calçados, salão, cuidados pessoais
+
+6. Movimento & Liberdade
+   Exemplos: combustível, transporte público, seguro do carro, manutenção, estacionamento
+
+7. Crescimento & Conhecimento
+   Exemplos: cursos, livros, treinamentos, escola, mentorias
+
+8. Família & Cuidado
+   Exemplos: filhos, netos, escola, presentes familiares, cuidados familiares
+
+9. Experiências & Alegria
+   Exemplos: viagens, lazer, restaurantes, passeios, férias
+
+10. Compromissos & Responsabilidade
+   Exemplos: dívidas, parcelas, cartões, acordos, financiamentos
+
+11. Generosidade & Propósito
+   Exemplos: doações, igreja, ajuda familiar, causas sociais
+
+12. Proteção & Reserva
+   Exemplos: emergências, seguros, reserva preventiva
+
+FUNCIONALIDADE:
+- Na aba de Saídas, adicionar campo “Categoria da despesa”.
+- O usuário deve escolher uma categoria antes de salvar a saída.
+- As categorias devem aparecer em relatórios/filtros da aba de Saídas, se já existir filtro.
+- Cada saída deve guardar sua categoria individualmente.
+
+AJUSTES:
+Criar em Ajustes uma seção chamada “Categorias de Saídas”.
+Nessa seção, o usuário poderá:
+- Editar nome da categoria;
+- Editar descrição da categoria;
+- Adicionar nova categoria;
+- Deletar categoria;
+- Reordenar categorias, se possível.
+
+REGRA IMPORTANTE:
+Editar, deletar e adicionar categorias deve existir APENAS em Ajustes, não diretamente na aba de Saídas. Isso evita alterações sem intenção.
+
+SEGURANÇA DOS DADOS:
+As categorias precisam ser salvas por usuário/conta/perfil, de forma isolada.
+As categorias do modo pessoal não podem alterar o modo business.
+As categorias do business não podem alterar o pessoal.
+Se o app usa user_id, profile_id, workspace_id, mode ou company_id, garantir que as categorias estejam vinculadas corretamente ao contexto ativo.
+
+PROBLEMA ATUAL:
+Quando abro a conta pessoal e a business, alterações feitas em uma parecem refletir na outra. Verificar se existe estado global, localStorage compartilhado ou cache compartilhado entre os modos.
+Corrigir para que cada modo/perfil tenha dados isolados.
+A pessoa precisa poder usar o modo pessoal e o modo business separadamente para fazer conciliação.
+
+REQUISITOS TÉCNICOS:
+- Não usar categorias hardcoded sem persistência.
+- Criar persistência adequada no banco de dados ou storage atual do app.
+- Garantir que categorias existentes sejam carregadas corretamente por usuário/perfil/modo.
+- Se não houver categorias criadas, carregar as categorias padrão apenas uma vez para aquele perfil.
+- Não duplicar categorias padrão toda vez que o usuário abrir o app.
+- Manter compatibilidade com despesas já existentes.
+- Se despesas antigas não tiverem categoria, mostrar como “Sem categoria” ou permitir edição posterior.
+
+Antes de implementar, analise o código atual e identifique onde os dados do modo pessoal e business estão sendo compartilhados indevidamente.
+Depois implemente com cuidado, sem afetar os cálculos financeiros principais.

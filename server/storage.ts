@@ -182,6 +182,10 @@ export interface IStorage {
   createFixedCost(data: InsertFixedCost): Promise<FixedCost>;
   updateFixedCost(userId: number, id: number, data: Partial<FixedCost>): Promise<FixedCost>;
   deleteFixedCost(userId: number, id: number): Promise<void>;
+  getMonthlyAccountMovements(userId: number, period: string): Promise<{
+    accountId: number; date: string; description: string; amount: number;
+    type: "income" | "expense"; transactionId: number;
+  }[]>;
   getMonthlyAccountSummary(userId: number, period: string): Promise<{ accountId: number; income: number }[]>;
   getExpenseCategories(userId: number, accountType: string): Promise<ExpenseCategory[]>;
   createExpenseCategory(data: InsertExpenseCategory): Promise<ExpenseCategory>;
@@ -589,6 +593,59 @@ export class DatabaseStorage implements IStorage {
     const [existing] = await db.select().from(fixedCosts).where(eq(fixedCosts.id, id));
     if (!existing || existing.userId !== userId) throw new Error("Custo fixo não encontrado");
     await db.delete(fixedCosts).where(eq(fixedCosts.id, id));
+  }
+
+  async getMonthlyAccountMovements(userId: number, period: string): Promise<{
+    accountId: number; date: string; description: string; amount: number;
+    type: "income" | "expense"; transactionId: number;
+  }[]> {
+    const [year, month] = period.split("-").map(Number);
+    if (!year || !month) return [];
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+    const endYear = month === 12 ? year + 1 : year;
+    const endMonth = month === 12 ? 1 : month + 1;
+    const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+
+    const result = await db.execute(sql`
+      SELECT ta.account_id        AS account_id,
+             t.date::text         AS date,
+             t.description        AS description,
+             ta.amount::bigint    AS amount,
+             'income'             AS type,
+             t.id                 AS transaction_id
+      FROM transaction_allocations ta
+      JOIN transactions t ON t.id = ta.transaction_id
+      WHERE t.user_id = ${userId}
+        AND t.type    = 'income'
+        AND t.date   >= ${startDate}
+        AND t.date    < ${endDate}
+
+      UNION ALL
+
+      SELECT account_id           AS account_id,
+             date::text           AS date,
+             description          AS description,
+             amount::bigint       AS amount,
+             'expense'            AS type,
+             id                   AS transaction_id
+      FROM transactions
+      WHERE user_id    = ${userId}
+        AND type       = 'expense'
+        AND account_id IS NOT NULL
+        AND date      >= ${startDate}
+        AND date       < ${endDate}
+
+      ORDER BY date DESC, transaction_id DESC
+    `);
+
+    return (result.rows as any[]).map(r => ({
+      accountId:     Number(r.account_id),
+      date:          String(r.date).split("T")[0],
+      description:   String(r.description),
+      amount:        Number(r.amount),
+      type:          r.type as "income" | "expense",
+      transactionId: Number(r.transaction_id),
+    }));
   }
 
   async getMonthlyAccountSummary(userId: number, period: string): Promise<{ accountId: number; income: number }[]> {

@@ -1,0 +1,51 @@
+The previous update added the monthly total “Entradas” per account, but this is not exactly what I need.
+
+Please keep the monthly totals, but I also need the transaction-level breakdown inside each account card.
+
+What I need:
+Inside each account card, where the transaction list/dropdown appears, please show both:
+
+1. Entrada transactions allocated to that account
+2. Saída transactions from that account
+
+Example:
+If I register an income of R$360 and the automatic distribution sends:
+
+* R$120 to Account 1
+* R$80 to Account 2
+* R$40 to Account 3
+* etc.
+
+Then, inside each account card, I need to see the specific Entrada transaction for that account, not only the total monthly entry.
+
+Expected layout inside each account card:
+
+Entradas:
+
+* 14/05/2026 — Income description — + R$120.00
+
+Saídas:
+
+* 14/05/2026 — Expense description — - R$40.00
+
+Or, if easier, show both in one transaction list with a clear type/column:
+
+Date | Description | Type | Amount
+14/05/2026 | Salary deposit | Entrada | + R$120.00
+14/05/2026 | Food shopping | Saída | - R$40.00
+
+Important:
+
+1. Each automatic income distribution must generate a visible “Entrada” record inside each account.
+2. The user must be able to see exactly how much of each income transaction was allocated to each account.
+3. Do not show only the total monthly entry. I need transaction-level visibility.
+4. Keep the current “Saldo Atual”, monthly “Entradas” total, and monthly “Saídas” total.
+5. Add the detailed breakdown inside the expandable transaction area.
+6. The logic must update correctly when an income is added, edited, or deleted.
+7. If an income transaction is deleted, the related distributed entry records must also disappear from each account.
+8. If an income transaction amount or percentage configuration is edited, the distributed entry values must recalculate correctly.
+9. Keep the design clean and mobile-friendly.
+10. Do not break the current automatic distribution logic.
+
+Business reason:
+I also separate the money physically in my bank/Revolut pockets. I need to know, for each income transaction, exactly how much went to each account, so I can transfer the correct amount in real life.

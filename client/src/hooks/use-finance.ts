@@ -70,6 +70,7 @@ export function useFinancialSync() {
     queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
     queryClient.invalidateQueries({ queryKey: [api.user.get.path] });
     queryClient.invalidateQueries({ queryKey: ["/api/accounts/monthly-summary"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/accounts/monthly-movements"] });
   }, [queryClient]);
 }
 
@@ -395,6 +396,28 @@ export function useDeleteFixedCost() {
     mutationFn: (id: number) =>
       apiFetch(`/api/fixed-costs/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/fixed-costs"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Monthly per-account movements: income allocations + expenses
+// ---------------------------------------------------------------------------
+
+export type AccountMovement = {
+  accountId: number;
+  date: string;
+  description: string;
+  amount: number;
+  type: "income" | "expense";
+  transactionId: number;
+};
+
+export function useMonthlyAccountMovements(period: string) {
+  return useQuery<AccountMovement[]>({
+    queryKey: ["/api/accounts/monthly-movements", period],
+    queryFn: () => apiFetch(`/api/accounts/monthly-movements?period=${encodeURIComponent(period)}`),
+    enabled: !!period,
+    staleTime: 30_000,
   });
 }
 

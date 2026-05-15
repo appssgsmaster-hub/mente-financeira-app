@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { useAccounts, useTransactions, useUser, useCommitments, useDebts, useRecalculateBalances, useMonthlyAccountSummary } from "@/hooks/use-finance";
+import { useAccounts, useTransactions, useUser, useCommitments, useDebts, useRecalculateBalances, useMonthlyAccountSummary, useMonthlyAccountMovements, type AccountMovement } from "@/hooks/use-finance";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/format";
 import { Card } from "@/components/ui/card";
@@ -80,6 +80,17 @@ export default function Dashboard() {
     (monthlySummary || []).forEach(s => map.set(s.accountId, s.income));
     return map;
   }, [monthlySummary]);
+
+  const { data: monthlyMovements } = useMonthlyAccountMovements(viewPeriod);
+
+  const movementsByAccount = useMemo(() => {
+    const map = new Map<number, AccountMovement[]>();
+    (monthlyMovements || []).forEach(m => {
+      if (!map.has(m.accountId)) map.set(m.accountId, []);
+      map.get(m.accountId)!.push(m);
+    });
+    return map;
+  }, [monthlyMovements]);
 
   function toggleAccountExpenses(id: number) {
     setOpenAccountExpenses(prev => {
@@ -591,11 +602,13 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {accounts?.map((account) => {
             const accTxs = expensesByAccount.get(account.id) || [];
-            const isExpanded = openAccountExpenses.has(account.id);
-            const showAll = showAllExpenses.has(account.id);
-            const displayed = showAll ? accTxs : accTxs.slice(0, 5);
             const totalSpent = accTxs.reduce((s, t) => s + t.amount, 0);
             const monthlyIncome = incomeByAccount.get(account.id) ?? 0;
+
+            const movements = movementsByAccount.get(account.id) || [];
+            const isExpanded = openAccountExpenses.has(account.id);
+            const showAll = showAllExpenses.has(account.id);
+            const displayedMovements = showAll ? movements : movements.slice(0, 6);
 
             return (
               <Card
@@ -677,9 +690,9 @@ export default function Dashboard() {
                   data-testid={`button-toggle-account-expenses-${account.id}`}
                 >
                   <span>
-                    {accTxs.length > 0
-                      ? `${accTxs.length} saída${accTxs.length !== 1 ? "s" : ""} · Total: ${formatValue(totalSpent)}`
-                      : "Nenhuma saída nesta conta"}
+                    {movements.length > 0
+                      ? `${movements.length} movimento${movements.length !== 1 ? "s" : ""} em ${MONTHS[viewMonth]}`
+                      : `Sem movimentos em ${MONTHS[viewMonth]}`}
                   </span>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
@@ -687,29 +700,52 @@ export default function Dashboard() {
                   />
                 </button>
 
-                {/* Collapsible expense list */}
+                {/* Collapsible unified movement list (income allocations + expenses) */}
                 {isExpanded && (
                   <div className="border-t border-border/30" data-testid={`content-account-expenses-${account.id}`}>
-                    {accTxs.length === 0 ? (
-                      <p className="px-6 py-4 text-xs text-muted-foreground italic">Nenhuma saída registrada para esta conta.</p>
+                    {movements.length === 0 ? (
+                      <p className="px-6 py-4 text-xs text-muted-foreground italic">
+                        Nenhum movimento registado para esta conta em {MONTHS[viewMonth]}.
+                      </p>
                     ) : (
                       <>
                         <div className="divide-y divide-border/30">
-                          {displayed.map((tx) => (
-                            <div key={tx.id} className="px-6 py-3 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors" data-testid={`row-account-expense-${tx.id}`}>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-foreground truncate">{tx.description}</p>
-                                <p className="text-[11px] text-muted-foreground mt-0.5">
-                                  {new Date(tx.date).toLocaleDateString("pt-BR")}
+                          {displayedMovements.map((mv, idx) => {
+                            const isIncome = mv.type === "income";
+                            return (
+                              <div
+                                key={`${mv.type}-${mv.transactionId}-${idx}`}
+                                className="px-6 py-3 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors"
+                                data-testid={`row-account-movement-${mv.type}-${mv.transactionId}`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                  <div
+                                    className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                                      isIncome ? "bg-secondary/15" : "bg-destructive/10"
+                                    }`}
+                                  >
+                                    {isIncome
+                                      ? <ArrowUpRight className="w-3 h-3 text-secondary" />
+                                      : <ArrowDownRight className="w-3 h-3 text-destructive" />}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-foreground truncate">{mv.description}</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                      {mv.date.split("-").reverse().join("/")}
+                                      <span className={`ml-2 font-semibold ${isIncome ? "text-secondary" : "text-destructive"}`}>
+                                        {isIncome ? "Entrada" : "Saída"}
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                                <p className={`text-sm font-bold whitespace-nowrap shrink-0 ${isIncome ? "text-secondary" : "text-destructive"}`}>
+                                  {isIncome ? "+" : "-"} {formatValue(mv.amount)}
                                 </p>
                               </div>
-                              <p className="text-sm font-bold text-destructive whitespace-nowrap shrink-0">
-                                - {formatValue(tx.amount)}
-                              </p>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
-                        {accTxs.length > 5 && (
+                        {movements.length > 6 && (
                           <div className="px-6 py-3 border-t border-border/30">
                             <button
                               className="text-xs font-semibold hover:underline transition-colors"
@@ -717,7 +753,7 @@ export default function Dashboard() {
                               onClick={() => toggleShowAllExpenses(account.id)}
                               data-testid={`button-show-all-expenses-${account.id}`}
                             >
-                              {showAll ? "Ver menos" : `Ver mais ${accTxs.length - 5} transações`}
+                              {showAll ? "Ver menos" : `Ver mais ${movements.length - 6} movimentos`}
                             </button>
                           </div>
                         )}

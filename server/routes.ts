@@ -724,6 +724,20 @@ export async function registerRoutes(
     }
   });
 
+  // ── Monthly per-account movements (income allocations + expenses) ─────────
+  app.get("/api/accounts/monthly-movements", requireAuth, async (req, res) => {
+    try {
+      const now = new Date();
+      const period = (req.query["period"] as string) ||
+        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const data = await storage.getMonthlyAccountMovements(req.session.userId!, period);
+      res.json(data);
+    } catch (err) {
+      console.error("[GET /api/accounts/monthly-movements]", err);
+      res.status(500).json({ message: "Erro ao obter movimentos mensais." });
+    }
+  });
+
   // ── Monthly account income summary (from transactionAllocations) ──────────
   app.get("/api/accounts/monthly-summary", requireAuth, async (req, res) => {
     try {

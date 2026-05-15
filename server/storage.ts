@@ -182,6 +182,7 @@ export interface IStorage {
   createFixedCost(data: InsertFixedCost): Promise<FixedCost>;
   updateFixedCost(userId: number, id: number, data: Partial<FixedCost>): Promise<FixedCost>;
   deleteFixedCost(userId: number, id: number): Promise<void>;
+  getMonthlyAccountSummary(userId: number, period: string): Promise<{ accountId: number; income: number }[]>;
   getExpenseCategories(userId: number, accountType: string): Promise<ExpenseCategory[]>;
   createExpenseCategory(data: InsertExpenseCategory): Promise<ExpenseCategory>;
   updateExpenseCategory(userId: number, id: number, data: Partial<ExpenseCategory>): Promise<ExpenseCategory>;
@@ -588,6 +589,31 @@ export class DatabaseStorage implements IStorage {
     const [existing] = await db.select().from(fixedCosts).where(eq(fixedCosts.id, id));
     if (!existing || existing.userId !== userId) throw new Error("Custo fixo não encontrado");
     await db.delete(fixedCosts).where(eq(fixedCosts.id, id));
+  }
+
+  async getMonthlyAccountSummary(userId: number, period: string): Promise<{ accountId: number; income: number }[]> {
+    // period = "YYYY-MM"
+    const [year, month] = period.split("-").map(Number);
+    if (!year || !month) return [];
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+    const endYear = month === 12 ? year + 1 : year;
+    const endMonth = month === 12 ? 1 : month + 1;
+    const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+
+    const result = await db.execute(
+      sql`SELECT ta.account_id, SUM(ta.amount)::bigint AS income
+          FROM transaction_allocations ta
+          JOIN transactions t ON t.id = ta.transaction_id
+          WHERE t.user_id = ${userId}
+            AND t.type = 'income'
+            AND t.date >= ${startDate}
+            AND t.date < ${endDate}
+          GROUP BY ta.account_id`
+    );
+    return (result.rows as any[]).map(r => ({
+      accountId: Number(r.account_id),
+      income: Number(r.income),
+    }));
   }
 
   async getExpenseCategories(userId: number, accountType: string): Promise<ExpenseCategory[]> {

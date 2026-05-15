@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { useAccounts, useTransactions, useUser, useCommitments, useDebts, useRecalculateBalances } from "@/hooks/use-finance";
+import { useAccounts, useTransactions, useUser, useCommitments, useDebts, useRecalculateBalances, useMonthlyAccountSummary } from "@/hooks/use-finance";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/format";
 import { Card } from "@/components/ui/card";
@@ -71,6 +71,15 @@ export default function Dashboard() {
   const [showAllExpenses, setShowAllExpenses] = useState<Set<number>>(new Set());
   const [viewMonth, setViewMonth] = useState<number>(now.getMonth());
   const [viewYear, setViewYear] = useState<number>(now.getFullYear());
+
+  const viewPeriod = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+  const { data: monthlySummary } = useMonthlyAccountSummary(viewPeriod);
+
+  const incomeByAccount = useMemo(() => {
+    const map = new Map<number, number>();
+    (monthlySummary || []).forEach(s => map.set(s.accountId, s.income));
+    return map;
+  }, [monthlySummary]);
 
   function toggleAccountExpenses(id: number) {
     setOpenAccountExpenses(prev => {
@@ -586,6 +595,7 @@ export default function Dashboard() {
             const showAll = showAllExpenses.has(account.id);
             const displayed = showAll ? accTxs : accTxs.slice(0, 5);
             const totalSpent = accTxs.reduce((s, t) => s + t.amount, 0);
+            const monthlyIncome = incomeByAccount.get(account.id) ?? 0;
 
             return (
               <Card
@@ -624,12 +634,32 @@ export default function Dashboard() {
                     <p className="text-xs sm:text-sm text-muted-foreground mb-1">
                       Saldo Atual
                     </p>
-                    <p className="text-xl sm:text-3xl font-display font-bold text-foreground">
+                    <p className="text-xl sm:text-3xl font-display font-bold text-foreground" data-testid={`text-account-balance-${account.id}`}>
                       {formatValue(account.balance)}
                     </p>
                   </div>
 
-                  <div className="mt-6 w-full bg-muted h-2 rounded-full overflow-hidden">
+                  {/* Monthly Entradas / Saídas for the selected period */}
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="rounded-xl bg-secondary/5 border border-secondary/15 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-secondary/60 mb-0.5">
+                        Entradas · {MONTHS[viewMonth]}
+                      </p>
+                      <p className="text-sm sm:text-base font-display font-bold text-secondary" data-testid={`text-account-income-${account.id}`}>
+                        {formatValue(monthlyIncome)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-destructive/5 border border-destructive/15 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-destructive/60 mb-0.5">
+                        Saídas · {MONTHS[viewMonth]}
+                      </p>
+                      <p className="text-sm sm:text-base font-display font-bold text-destructive" data-testid={`text-account-expense-${account.id}`}>
+                        {formatValue(totalSpent)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 w-full bg-muted h-2 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full"
                       style={{

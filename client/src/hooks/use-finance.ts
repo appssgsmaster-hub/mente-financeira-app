@@ -69,6 +69,7 @@ export function useFinancialSync() {
     queryClient.invalidateQueries({ queryKey: ["/api/commitments"] });
     queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
     queryClient.invalidateQueries({ queryKey: [api.user.get.path] });
+    queryClient.invalidateQueries({ queryKey: ["/api/accounts/monthly-summary"] });
   }, [queryClient]);
 }
 
@@ -394,6 +395,19 @@ export function useDeleteFixedCost() {
     mutationFn: (id: number) =>
       apiFetch(`/api/fixed-costs/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/fixed-costs"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Monthly per-account income summary (from transactionAllocations)
+// ---------------------------------------------------------------------------
+
+export function useMonthlyAccountSummary(period: string) {
+  return useQuery<{ accountId: number; income: number }[]>({
+    queryKey: ["/api/accounts/monthly-summary", period],
+    queryFn: () => apiFetch(`/api/accounts/monthly-summary?period=${encodeURIComponent(period)}`),
+    enabled: !!period,
+    staleTime: 30_000,
   });
 }
 

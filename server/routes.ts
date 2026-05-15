@@ -724,6 +724,21 @@ export async function registerRoutes(
     }
   });
 
+  // ── Monthly account income summary (from transactionAllocations) ──────────
+  app.get("/api/accounts/monthly-summary", requireAuth, async (req, res) => {
+    try {
+      const period = (req.query["period"] as string) || (() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      })();
+      const data = await storage.getMonthlyAccountSummary(req.session.userId!, period);
+      res.json(data);
+    } catch (err) {
+      console.error("[GET /api/accounts/monthly-summary]", err);
+      res.status(500).json({ message: "Erro ao obter resumo mensal." });
+    }
+  });
+
   // ── Expense Categories ─────────────────────────────────────────────────────
   app.get("/api/expense-categories", requireAuth, async (req, res) => {
     try {

@@ -50,10 +50,19 @@ function weeklyOccurrencesInMonth(startDateStr: string, monthIndex: number, year
   return Math.ceil(daysInRange / 7);
 }
 
+function biweeklyOccurrencesInMonth(startDateStr: string, monthIndex: number, year: number) {
+  const startDate = new Date(startDateStr);
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 0);
+  const effectiveStart = startDate > monthStart ? startDate : monthStart;
+  if (effectiveStart > monthEnd) return 0;
+  const daysInRange = Math.floor((monthEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  return Math.ceil(daysInRange / 14);
+}
+
 function getMonthlyValue(c: any, monthIndex: number, year: number) {
-  if (c.recurrence === "SEMANAL") {
-    return c.value * weeklyOccurrencesInMonth(c.startDate, monthIndex, year);
-  }
+  if (c.recurrence === "SEMANAL") return c.value * weeklyOccurrencesInMonth(c.startDate, monthIndex, year);
+  if (c.recurrence === "QUINZENAL") return c.value * biweeklyOccurrencesInMonth(c.startDate, monthIndex, year);
   return c.value;
 }
 
@@ -174,12 +183,14 @@ export default function Dashboard() {
 
       const d = new Date(c.startDate);
       const t = d.getTime();
-      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
-        return t <= msEnd;
-      }
-      const n = Math.max(1, Number(c.installments ?? 1));
+      if (t > msEnd) return false;
       const diff = (viewYear - d.getFullYear()) * 12 + (viewMonth - d.getMonth());
-      return diff >= 0 && diff < n && t <= msEnd;
+      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL" || c.recurrence === "QUINZENAL") return true;
+      if (c.recurrence === "TRIMESTRAL") return diff >= 0 && diff % 3 === 0;
+      if (c.recurrence === "SEMESTRAL")  return diff >= 0 && diff % 6 === 0;
+      if (c.recurrence === "ANUAL")      return diff >= 0 && diff % 12 === 0;
+      const n = Math.max(1, Number(c.installments ?? 1));
+      return diff >= 0 && diff < n;
     }).map(c => ({
       ...c,
       status: ((c as any).dueDate ?? c.startDate) < todayStr ? 'atrasado' : 'soon',
@@ -197,12 +208,14 @@ export default function Dashboard() {
 
       const d = new Date(c.startDate);
       const t = d.getTime();
-      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
-        return t <= msEnd;
-      }
-      const n = Math.max(1, Number(c.installments ?? 1));
+      if (t > msEnd) return false;
       const diff = (viewYear - d.getFullYear()) * 12 + (viewMonth - d.getMonth());
-      return diff >= 0 && diff < n && t <= msEnd;
+      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL" || c.recurrence === "QUINZENAL") return true;
+      if (c.recurrence === "TRIMESTRAL") return diff >= 0 && diff % 3 === 0;
+      if (c.recurrence === "SEMESTRAL")  return diff >= 0 && diff % 6 === 0;
+      if (c.recurrence === "ANUAL")      return diff >= 0 && diff % 12 === 0;
+      const n = Math.max(1, Number(c.installments ?? 1));
+      return diff >= 0 && diff < n;
     }).map(c => ({
       ...c,
       accountName: accounts?.find((a: any) => a.id === c.accountId)?.name || 'Conta'
@@ -403,7 +416,7 @@ export default function Dashboard() {
                         <div className="flex justify-between items-start gap-2">
                           <p className="font-bold truncate text-foreground">
                             {alert.description}
-                            {alert.recurrence === "SEMANAL" ? " (semanal)" : ""}
+                            {alert.recurrence !== "FIXO" && alert.recurrence !== "PARCELADO" ? ` (${alert.recurrence.toLowerCase()})` : ""}
                           </p>
                           <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] whitespace-nowrap ${alert.status === 'atrasado' ? 'bg-destructive/10 text-destructive' : 'bg-orange-500/10 text-orange-600'}`}>
                             {alert.status === 'atrasado' ? 'Atrasado' : 'Vence logo'}
@@ -522,7 +535,7 @@ export default function Dashboard() {
                           <p className="font-medium text-sm text-foreground truncate">{item.description}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {item.accountName}
-                            {item.recurrence === "SEMANAL" ? " · Semanal" : item.recurrence === "PARCELADO" ? ` · ${item.installments}x` : " · Mensal"}
+                            {item.recurrence === "PARCELADO" ? ` · ${item.installments}x` : ` · ${({"FIXO":"Mensal","SEMANAL":"Semanal","QUINZENAL":"Quinzenal","TRIMESTRAL":"Trimestral","SEMESTRAL":"Semestral","ANUAL":"Anual"} as Record<string,string>)[item.recurrence] ?? item.recurrence}`}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
@@ -808,7 +821,7 @@ export default function Dashboard() {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-sm text-foreground truncate">
                         {alert.description}
-                        {alert.recurrence === "SEMANAL" ? " (semanal)" : ""}
+                        {alert.recurrence !== "FIXO" && alert.recurrence !== "PARCELADO" ? ` (${alert.recurrence.toLowerCase()})` : ""}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {(alert as any).dueDate

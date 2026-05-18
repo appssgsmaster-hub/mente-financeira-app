@@ -29,7 +29,7 @@ import {
 } from "recharts";
 import type { Commitment } from "@shared/schema";
 
-type Recurrence = "FIXO" | "SEMANAL" | "PARCELADO";
+type Recurrence = "FIXO" | "SEMANAL" | "QUINZENAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL" | "PARCELADO";
 type CommitmentType = "expense" | "income";
 
 const EXPENSE_CATEGORIES = [
@@ -69,19 +69,48 @@ function weeklyOccurrencesInMonth(startDateStr: string, monthIndex: number, year
   const startDate = new Date(startDateStr);
   const monthStart = new Date(year, monthIndex, 1);
   const monthEnd = new Date(year, monthIndex + 1, 0);
-
   const effectiveStart = startDate > monthStart ? startDate : monthStart;
   if (effectiveStart > monthEnd) return 0;
-
   const daysInRange = Math.floor((monthEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   return Math.ceil(daysInRange / 7);
 }
 
+function biweeklyOccurrencesInMonth(startDateStr: string, monthIndex: number, year: number) {
+  const startDate = new Date(startDateStr);
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 0);
+  const effectiveStart = startDate > monthStart ? startDate : monthStart;
+  if (effectiveStart > monthEnd) return 0;
+  const daysInRange = Math.floor((monthEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  return Math.ceil(daysInRange / 14);
+}
+
 function getMonthlyValue(c: any, monthIndex: number, year: number) {
-  if (c.recurrence === "SEMANAL") {
-    return c.value * weeklyOccurrencesInMonth(c.startDate, monthIndex, year);
-  }
+  if (c.recurrence === "SEMANAL") return c.value * weeklyOccurrencesInMonth(c.startDate, monthIndex, year);
+  if (c.recurrence === "QUINZENAL") return c.value * biweeklyOccurrencesInMonth(c.startDate, monthIndex, year);
   return c.value;
+}
+
+function recurrenceLabel(c: any): string {
+  switch (c.recurrence) {
+    case "FIXO":       return "Mensal";
+    case "SEMANAL":    return "Semanal";
+    case "QUINZENAL":  return "Quinzenal";
+    case "TRIMESTRAL": return "Trimestral";
+    case "SEMESTRAL":  return "Semestral";
+    case "ANUAL":      return "Anual";
+    case "PARCELADO":  return `${c.installments}x`;
+    default:           return c.recurrence;
+  }
+}
+
+function recurrenceUnit(c: any): string | null {
+  if (c.recurrence === "SEMANAL")   return "/semana";
+  if (c.recurrence === "QUINZENAL") return "/quinzena";
+  if (c.recurrence === "TRIMESTRAL") return "/trimestre";
+  if (c.recurrence === "SEMESTRAL") return "/semestre";
+  if (c.recurrence === "ANUAL")     return "/ano";
+  return null;
 }
 
 function pad2(n: number) {
@@ -118,13 +147,17 @@ function isActiveInMonth(c: any, monthIndex: number, year: number) {
   const d = new Date(c.startDate);
   const msEnd = new Date(year, monthIndex + 1, 0).getTime();
   const t = d.getTime();
+  if (t > msEnd) return false;
 
-  if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
-    return t <= msEnd;
-  }
-  const n = Math.max(1, Number(c.installments ?? 1));
   const diff = (year - d.getFullYear()) * 12 + (monthIndex - d.getMonth());
-  return diff >= 0 && diff < n && t <= msEnd;
+
+  if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL" || c.recurrence === "QUINZENAL") return true;
+  if (c.recurrence === "TRIMESTRAL") return diff >= 0 && diff % 3 === 0;
+  if (c.recurrence === "SEMESTRAL")  return diff >= 0 && diff % 6 === 0;
+  if (c.recurrence === "ANUAL")      return diff >= 0 && diff % 12 === 0;
+  // PARCELADO
+  const n = Math.max(1, Number(c.installments ?? 1));
+  return diff >= 0 && diff < n;
 }
 
 export default function Projections() {
@@ -454,7 +487,7 @@ export default function Projections() {
                         <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
                           <span className="bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-md">{c.category}</span>
                           <span className="bg-primary/5 text-primary px-1.5 py-0.5 rounded-md">
-                            {c.recurrence === "FIXO" ? "Mensal" : c.recurrence === "SEMANAL" ? "Semanal" : `${c.installments}x`}
+                            {recurrenceLabel(c)}
                           </span>
                           <span className="bg-muted px-1.5 py-0.5 rounded-md flex items-center gap-1">
                             <Calendar className="w-2.5 h-2.5" />
@@ -466,9 +499,11 @@ export default function Projections() {
                               Vence: {new Date((c as any).dueDate).toLocaleDateString("pt-BR")}
                             </span>
                           )}
-                          {c.recurrence === "SEMANAL" && (
+                          {(c.recurrence === "SEMANAL" || c.recurrence === "QUINZENAL") && (
                             <span className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-md">
-                              {weeklyOccurrencesInMonth(c.startDate, monthIndex, currentYear)}x no mês = {formatCurrency(monthlyVal)}
+                              {c.recurrence === "SEMANAL"
+                                ? weeklyOccurrencesInMonth(c.startDate, monthIndex, currentYear)
+                                : biweeklyOccurrencesInMonth(c.startDate, monthIndex, currentYear)}x no mês = {formatCurrency(monthlyVal)}
                             </span>
                           )}
                         </div>
@@ -476,7 +511,7 @@ export default function Projections() {
                       <div className="flex items-center gap-2 shrink-0 ml-4">
                         <div className="text-right">
                           <span className={`font-display font-bold text-lg ${paid ? "text-green-700 dark:text-green-400" : "text-secondary"}`}>{formatCurrency(c.value)}</span>
-                          {c.recurrence === "SEMANAL" && <p className="text-[10px] text-muted-foreground">/semana</p>}
+                          {recurrenceUnit(c) && <p className="text-[10px] text-muted-foreground">{recurrenceUnit(c)}</p>}
                         </div>
                         <div className="flex flex-col gap-1">
                           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(c); }} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-primary">
@@ -571,7 +606,7 @@ export default function Projections() {
                               <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
                                 <span className="bg-muted px-1.5 py-0.5 rounded-md">{c.category}</span>
                                 <span className="bg-primary/5 text-primary px-1.5 py-0.5 rounded-md">
-                                  {c.recurrence === "FIXO" ? "Mensal" : c.recurrence === "SEMANAL" ? "Semanal" : `${c.installments} parcelas`}
+                                  {recurrenceLabel(c)}
                                 </span>
                                 <span className="bg-muted px-1.5 py-0.5 rounded-md flex items-center gap-1">
                                   <Calendar className="w-2.5 h-2.5" />
@@ -583,9 +618,11 @@ export default function Projections() {
                                     Vence: {new Date((c as any).dueDate).toLocaleDateString("pt-BR")}
                                   </span>
                                 )}
-                                {c.recurrence === "SEMANAL" && (
+                                {(c.recurrence === "SEMANAL" || c.recurrence === "QUINZENAL") && (
                                   <span className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-md">
-                                    {weeklyOccurrencesInMonth(c.startDate, monthIndex, currentYear)}x no mês = {formatCurrency(monthlyVal)}
+                                    {c.recurrence === "SEMANAL"
+                                      ? weeklyOccurrencesInMonth(c.startDate, monthIndex, currentYear)
+                                      : biweeklyOccurrencesInMonth(c.startDate, monthIndex, currentYear)}x no mês = {formatCurrency(monthlyVal)}
                                   </span>
                                 )}
                               </div>
@@ -593,7 +630,7 @@ export default function Projections() {
                             <div className="flex items-center gap-2 shrink-0 ml-4">
                               <div className="text-right">
                                 <span className={`font-display font-bold text-lg ${paid ? "text-green-700 dark:text-green-400" : "text-foreground"}`}>{formatCurrency(c.value)}</span>
-                                {c.recurrence === "SEMANAL" && <p className="text-[10px] text-muted-foreground">/semana</p>}
+                                {recurrenceUnit(c) && <p className="text-[10px] text-muted-foreground">{recurrenceUnit(c)}</p>}
                               </div>
                               <div className="flex flex-col gap-1">
                                 <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(c); }} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-primary">
@@ -689,11 +726,20 @@ export default function Projections() {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Recorrência</label>
-                  <div className="flex p-1 bg-muted rounded-[20px] h-14">
-                    <button onClick={() => setRecurrence("FIXO")} className={`flex-1 rounded-[16px] text-xs font-bold transition-all ${recurrence === "FIXO" ? "bg-white dark:bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`} data-testid="btn-recurrence-fixo">MENSAL</button>
-                    <button onClick={() => setRecurrence("SEMANAL")} className={`flex-1 rounded-[16px] text-xs font-bold transition-all ${recurrence === "SEMANAL" ? "bg-white dark:bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`} data-testid="btn-recurrence-semanal">SEMANAL</button>
-                    <button onClick={() => setRecurrence("PARCELADO")} className={`flex-1 rounded-[16px] text-xs font-bold transition-all ${recurrence === "PARCELADO" ? "bg-white dark:bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"}`} data-testid="btn-recurrence-parcelado">PARCELADO</button>
-                  </div>
+                  <select
+                    className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium appearance-none cursor-pointer"
+                    value={recurrence}
+                    onChange={e => setRecurrence(e.target.value as Recurrence)}
+                    data-testid="select-recurrence"
+                  >
+                    <option value="FIXO">Mensal (todo mês)</option>
+                    <option value="SEMANAL">Semanal (toda semana)</option>
+                    <option value="QUINZENAL">Quinzenal (cada 2 semanas)</option>
+                    <option value="TRIMESTRAL">Trimestral (cada 3 meses)</option>
+                    <option value="SEMESTRAL">Semestral (cada 6 meses)</option>
+                    <option value="ANUAL">Anual (1× por ano)</option>
+                    <option value="PARCELADO">Parcelado (nº fixo de vezes)</option>
+                  </select>
                 </div>
 
                 {commitmentType === "expense" && (

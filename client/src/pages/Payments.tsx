@@ -76,6 +76,8 @@ export default function Payments() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [txDate, setTxDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [linkedCommitment, setLinkedCommitment] = useState<string>("");
+  const [filterMonth, setFilterMonth] = useState<number>(new Date().getMonth());
+  const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(true);
@@ -89,55 +91,65 @@ export default function Payments() {
   const { data: commitments = [] } = useCommitments();
   const { mutate: updateCommitmentMut } = useUpdateCommitment();
 
-  const openCommitments = useMemo(() => {
-    const now = new Date();
-    const currentPeriod = getCurrentPeriod();
-    const monthIndex = now.getMonth();
-    const year = now.getFullYear();
-    const msEnd = new Date(year, monthIndex + 1, 0).getTime();
+  const filterPeriod = `${filterYear}-${String(filterMonth + 1).padStart(2, "0")}`;
 
+  const openCommitments = useMemo(() => {
+    const msEnd = new Date(filterYear, filterMonth + 1, 0).getTime();
     return commitments.filter((c) => {
       if ((c.commitmentType || "expense") !== "expense") return false;
-      const d = new Date(c.startDate);
+      const d = new Date(c.startDate + "T12:00:00");
       const t = d.getTime();
       let active = false;
-      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
+      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL" || c.recurrence === "QUINZENAL") {
         active = t <= msEnd;
+      } else if (c.recurrence === "TRIMESTRAL") {
+        const diff = (filterYear - d.getFullYear()) * 12 + (filterMonth - d.getMonth());
+        active = diff >= 0 && diff % 3 === 0 && t <= msEnd;
+      } else if (c.recurrence === "SEMESTRAL") {
+        const diff = (filterYear - d.getFullYear()) * 12 + (filterMonth - d.getMonth());
+        active = diff >= 0 && diff % 6 === 0 && t <= msEnd;
+      } else if (c.recurrence === "ANUAL") {
+        const diff = (filterYear - d.getFullYear()) * 12 + (filterMonth - d.getMonth());
+        active = diff >= 0 && diff % 12 === 0 && t <= msEnd;
       } else {
         const n = Math.max(1, Number(c.installments ?? 1));
-        const diff = (year - d.getFullYear()) * 12 + (monthIndex - d.getMonth());
+        const diff = (filterYear - d.getFullYear()) * 12 + (filterMonth - d.getMonth());
         active = diff >= 0 && diff < n && t <= msEnd;
       }
       if (!active) return false;
       const paid = (c.paidPeriods as string[]) || [];
-      return !paid.includes(currentPeriod);
+      return !paid.includes(filterPeriod);
     });
-  }, [commitments]);
+  }, [commitments, filterMonth, filterYear, filterPeriod]);
 
   const openIncomeCommitments = useMemo(() => {
-    const now = new Date();
-    const currentPeriod = getCurrentPeriod();
-    const monthIndex = now.getMonth();
-    const year = now.getFullYear();
-    const msEnd = new Date(year, monthIndex + 1, 0).getTime();
-
+    const msEnd = new Date(filterYear, filterMonth + 1, 0).getTime();
     return commitments.filter((c) => {
       if (c.commitmentType !== "income") return false;
-      const d = new Date(c.startDate);
+      const d = new Date(c.startDate + "T12:00:00");
       const t = d.getTime();
       let active = false;
-      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL") {
+      if (c.recurrence === "FIXO" || c.recurrence === "SEMANAL" || c.recurrence === "QUINZENAL") {
         active = t <= msEnd;
+      } else if (c.recurrence === "TRIMESTRAL") {
+        const diff = (filterYear - d.getFullYear()) * 12 + (filterMonth - d.getMonth());
+        active = diff >= 0 && diff % 3 === 0 && t <= msEnd;
+      } else if (c.recurrence === "SEMESTRAL") {
+        const diff = (filterYear - d.getFullYear()) * 12 + (filterMonth - d.getMonth());
+        active = diff >= 0 && diff % 6 === 0 && t <= msEnd;
+      } else if (c.recurrence === "ANUAL") {
+        const diff = (filterYear - d.getFullYear()) * 12 + (filterMonth - d.getMonth());
+        active = diff >= 0 && diff % 12 === 0 && t <= msEnd;
       } else {
         const n = Math.max(1, Number(c.installments ?? 1));
-        const diff = (year - d.getFullYear()) * 12 + (monthIndex - d.getMonth());
+        const diff = (filterYear - d.getFullYear()) * 12 + (filterMonth - d.getMonth());
         active = diff >= 0 && diff < n && t <= msEnd;
       }
       if (!active) return false;
       const paid = (c.paidPeriods as string[]) || [];
-      return !paid.includes(currentPeriod);
+      return !paid.includes(filterPeriod);
     });
-  }, [commitments]);
+  }, [commitments, filterMonth, filterYear, filterPeriod]);
 
   function handleLinkChange(commitmentId: string) {
     setLinkedCommitment(commitmentId);
@@ -161,12 +173,11 @@ export default function Payments() {
     return c ? ((c.commitmentType || "expense") as "expense" | "income") : null;
   }
 
-  function markCommitmentPaid(commitmentId: string, dateStr: string) {
+  function markCommitmentPaid(commitmentId: string, period: string) {
     if (!user?.id) return;
     const numId = parseInt(commitmentId);
     const c = commitments.find((x) => x.id === numId);
     if (!c) return;
-    const period = getPeriodFromDate(dateStr);
     const paid = (c.paidPeriods as string[]) || [];
     if (paid.includes(period)) return;
     updateCommitmentMut({ id: numId, data: { paidPeriods: [...paid, period] } });
@@ -192,7 +203,7 @@ export default function Payments() {
       if (!val || !desc) return toast({ title: "Erro", description: "Preencha valor e descrição", variant: "destructive" });
       distributeIncome({ amount: Math.round(val * 100), description: desc, date: txDate }, {
         onSuccess: () => {
-          markCommitmentPaid(linkedCommitment, txDate);
+          markCommitmentPaid(linkedCommitment, filterPeriod);
           toast({ title: "Sucesso", description: "Entrada registrada e receita marcada como recebida!" });
           setDesc(""); setAmount(""); setSelectedAcc(""); setTxDate(new Date().toISOString().split("T")[0]); setLinkedCommitment("");
         }
@@ -214,7 +225,7 @@ export default function Payments() {
     } as any, {
       onSuccess: () => {
         if (linkedCommitment) {
-          markCommitmentPaid(linkedCommitment, txDate);
+          markCommitmentPaid(linkedCommitment, filterPeriod);
           toast({ title: "Sucesso", description: "Saída registrada e compromisso marcado como pago!" });
         } else {
           toast({ title: "Sucesso", description: "Saída registrada com sucesso!" });
@@ -274,17 +285,49 @@ export default function Payments() {
             <PlusCircle className="w-5 h-5 text-primary" /> Novo Lançamento
           </h2>
           <div className="space-y-4">
-            <div className="space-y-1">
+            <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Link2 className="w-3.5 h-3.5" /> Vincular?
               </label>
+              {/* Month/year filter */}
+              <div className="flex gap-2">
+                <select
+                  className="flex-1 p-2.5 rounded-xl border border-input bg-background text-sm"
+                  value={filterMonth}
+                  onChange={(e) => { setFilterMonth(Number(e.target.value)); setLinkedCommitment(""); }}
+                  data-testid="select-filter-month"
+                >
+                  {["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"].map((m, i) => (
+                    <option key={i} value={i}>{m}</option>
+                  ))}
+                </select>
+                <select
+                  className="w-24 p-2.5 rounded-xl border border-input bg-background text-sm"
+                  value={filterYear}
+                  onChange={(e) => { setFilterYear(Number(e.target.value)); setLinkedCommitment(""); }}
+                  data-testid="select-filter-year"
+                >
+                  {[filterYear - 1, filterYear, filterYear + 1].map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Past month indicator */}
+              {filterPeriod !== `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}` && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1" data-testid="text-past-month-indicator">
+                  ⚠ A exibir compromissos de{" "}
+                  <span className="font-bold">
+                    {new Date(filterYear, filterMonth, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                  </span>
+                </p>
+              )}
               <select
                 className="w-full p-3 rounded-2xl border border-input bg-background text-sm"
                 value={linkedCommitment}
                 onChange={(e) => handleLinkChange(e.target.value)}
                 data-testid="select-link-commitment"
               >
-                <option value="">Manual</option>
+                <option value="">Manual (sem vincular)</option>
                 {openCommitments.length > 0 && (
                   <optgroup label="Compromissos (Saídas)">
                     {openCommitments.map((c) => (
@@ -302,6 +345,11 @@ export default function Payments() {
                       </option>
                     ))}
                   </optgroup>
+                )}
+                {openCommitments.length === 0 && openIncomeCommitments.length === 0 && (
+                  <option disabled>
+                    Nenhum compromisso pendente em {new Date(filterYear, filterMonth, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                  </option>
                 )}
               </select>
             </div>

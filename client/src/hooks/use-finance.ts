@@ -277,6 +277,19 @@ export function useDeleteCommitment() {
   });
 }
 
+export function usePayCommitmentPeriod() {
+  const sync = useFinancialSync();
+  return useMutation({
+    mutationFn: ({ id, period }: { id: number; period: string }) =>
+      apiFetch<{ commitment: Commitment; transaction: unknown }>(`/api/commitments/${id}/pay-period`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ period }),
+      }),
+    onSuccess: () => sync(),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Debt mutations
 // ---------------------------------------------------------------------------

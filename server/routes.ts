@@ -433,6 +433,43 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/commitments/:id/pay-period", requireActiveSubscription, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const { period } = req.body as { period?: string };
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ message: "Período inválido. Use o formato YYYY-MM." });
+      }
+      const allCommitments = await storage.getCommitments(req.session.userId!);
+      const commitment = allCommitments.find(c => c.id === id);
+      if (!commitment) {
+        return res.status(404).json({ message: "Compromisso não encontrado" });
+      }
+      const paidPeriods = (commitment.paidPeriods as string[]) || [];
+      if (paidPeriods.includes(period)) {
+        return res.status(400).json({ message: "Este período já está registado como pago." });
+      }
+      const updated = await storage.updateCommitment(req.session.userId!, id, {
+        paidPeriods: [...paidPeriods, period],
+      });
+      let transaction = null;
+      if (commitment.accountId) {
+        transaction = await storage.createTransaction({
+          userId: req.session.userId!,
+          accountId: commitment.accountId,
+          description: `Parcela: ${commitment.description}`,
+          amount: commitment.value,
+          type: "expense",
+          isRecurring: false,
+          category: commitment.category || "Compromissos Financeiros",
+        });
+      }
+      res.json({ commitment: updated, transaction });
+    } catch (err) {
+      res.status(500).json({ message: (err as Error).message });
+    }
+  });
+
   app.get("/api/debts", requireActiveSubscription, async (req, res) => {
     const items = await storage.getDebts(req.session.userId!);
     res.json(items);

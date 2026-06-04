@@ -857,7 +857,7 @@ export default function Dashboard() {
         )}
       </Card>
 
-      {/* 7 — COLLAPSIBLE: DÍVIDAS ABERTAS */}
+      {/* 7 — COLLAPSIBLE: PLANO DE QUITAÇÃO */}
       <Card className="rounded-2xl border-border overflow-hidden" data-testid="card-open-debts">
         <button
           className="w-full p-4 sm:p-5 flex items-center justify-between text-left"
@@ -869,11 +869,11 @@ export default function Dashboard() {
               <CreditCard className="w-5 h-5 text-destructive" />
             </div>
             <div>
-              <h4 className="font-bold text-sm text-foreground" data-testid="text-debts-title">Open Debts</h4>
+              <h4 className="font-bold text-sm text-foreground" data-testid="text-debts-title">Plano de Quitação</h4>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {activeDebts.length > 0
-                  ? `${activeDebts.length} ${activeDebts.length === 1 ? "dívida ativa" : "dívidas ativas"} · ${formatValue(totalDebt)}`
-                  : "Nenhuma dívida registrada"}
+                  ? `${activeDebts.length} ${activeDebts.length === 1 ? "compromisso ativo" : "compromissos ativos"} · ${formatValue(totalDebt)}`
+                  : "Nenhum compromisso registrado"}
               </p>
             </div>
           </div>
@@ -898,7 +898,7 @@ export default function Dashboard() {
             ) : (
               <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
                 <CreditCard className="w-4 h-4 text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">Nenhuma dívida ativa registrada.</p>
+                <p className="text-xs text-muted-foreground">Nenhum compromisso ativo registrado.</p>
               </div>
             )}
             <Button
@@ -908,7 +908,7 @@ export default function Dashboard() {
               onClick={() => navigate("/dividas")}
               data-testid="button-go-to-debts"
             >
-              Gerenciar dívidas <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              Plano de Quitação <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </div>
         )}

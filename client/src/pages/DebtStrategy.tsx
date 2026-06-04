@@ -1,529 +1,674 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useUser, useAccounts, useDebts, useCreateDebt, useUpdateDebt, useDeleteDebt, useCreateCommitment } from "@/hooks/use-finance";
+import {
+  useUser,
+  useAccounts,
+  useCommitments,
+  useCreateCommitment,
+  useUpdateCommitment,
+  useDeleteCommitment,
+  usePayCommitmentPeriod,
+  useDebts,
+  useCreateDebt,
+  useUpdateDebt,
+  useDeleteDebt,
+} from "@/hooks/use-finance";
 import { formatCurrency } from "@/lib/format";
 import {
-  CreditCard,
-  PlusCircle,
-  Calculator,
-  Trash2,
   CheckCircle2,
   X,
   Target,
-  TrendingUp,
-  Shield,
-  Heart,
-  GraduationCap,
-  ArrowRight,
-  AlertTriangle,
-  Send,
+  PlusCircle,
+  ChevronDown,
+  ChevronRight,
+  Trash2,
   Pencil,
+  History,
+  TrendingDown,
+  CreditCard,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import type { Commitment } from "@shared/schema";
 
-type DebtPriority = "high" | "medium" | "low";
+function getPeriodKey(year: number, month: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
 
-const priorityOrder: Record<DebtPriority, number> = { high: 0, medium: 1, low: 2 };
-const priorityLabel: Record<DebtPriority, string> = { high: "Alta", medium: "Média", low: "Baixa" };
-const priorityColor: Record<DebtPriority, string> = {
-  high: "bg-destructive/10 text-destructive",
-  medium: "bg-amber-500/10 text-amber-600",
-  low: "bg-muted text-muted-foreground",
-};
+function formatPeriod(period: string) {
+  const [y, m] = period.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function getPlanStatus(paidCount: number, total: number) {
+  if (total === 0 || paidCount === 0) return "Em aberto";
+  if (paidCount >= total) return "Quitado";
+  return "Em andamento";
+}
+
+function statusStyle(status: string) {
+  if (status === "Quitado") return "bg-secondary/10 text-secondary";
+  if (status === "Em andamento") return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+  return "bg-muted text-muted-foreground";
+}
+
+function toCents(str: string) {
+  return Math.round(parseFloat(str.replace(/\./g, "").replace(",", ".")) * 100);
+}
+
+function fromCents(cents: number) {
+  return (cents / 100).toFixed(2).replace(".", ",");
+}
 
 export default function DebtStrategy() {
   const { data: user } = useUser();
   const { data: accounts } = useAccounts();
+  const { data: allCommitments = [] } = useCommitments();
+  const { data: debts = [] } = useDebts();
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
-  const { data: debts = [] } = useDebts();
+  const { mutate: createCommitment } = useCreateCommitment();
+  const { mutate: updateCommitment } = useUpdateCommitment();
+  const { mutate: deleteCommitment } = useDeleteCommitment();
+  const { mutate: payPeriod, isPending: isPayingPeriod } = usePayCommitmentPeriod();
   const { mutate: createDebt } = useCreateDebt();
   const { mutate: updateDebtMut } = useUpdateDebt();
   const { mutate: deleteDebtMut } = useDeleteDebt();
-  const { mutate: createCommitment } = useCreateCommitment();
 
-  const [showForm, setShowForm] = useState(false);
+  const fv = (v: number) => formatCurrency(v, user?.currency);
+
+  const now = new Date();
+  const currentPeriod = getPeriodKey(now.getFullYear(), now.getMonth());
+
+  // ── UI state ──────────────────────────────────────────────────────────────
+  const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [creditor, setCreditor] = useState("");
-  const [amount, setAmount] = useState("");
-  const [priority, setPriority] = useState<DebtPriority>("medium");
+  const [openHistoryId, setOpenHistoryId] = useState<number | null>(null);
+  const [showRegistros, setShowRegistros] = useState(false);
+  const [payingId, setPayingId] = useState<number | null>(null);
 
-  const [simDebtId, setSimDebtId] = useState<number | null>(null);
-  const [simPayment, setSimPayment] = useState("");
-  const [showSimModal, setShowSimModal] = useState(false);
-  const [simPriorityFilter, setSimPriorityFilter] = useState<DebtPriority | "all">("all");
+  // Plan form
+  const [desc, setDesc] = useState("");
+  const [totalVal, setTotalVal] = useState("");
+  const [instCount, setInstCount] = useState("");
+  const [instVal, setInstVal] = useState("");
+  const [accId, setAccId] = useState<number | "">("");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
 
-  const [showAiPopup, setShowAiPopup] = useState(false);
+  // Debt form
+  const [showDebtForm, setShowDebtForm] = useState(false);
+  const [editingDebtId, setEditingDebtId] = useState<number | null>(null);
+  const [debtCreditor, setDebtCreditor] = useState("");
+  const [debtAmt, setDebtAmt] = useState("");
+  const [debtPriority, setDebtPriority] = useState<"high" | "medium" | "low">("medium");
+
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const defaultAccId = useMemo(() => {
+    if (!accounts?.length) return "";
+    return accounts.find(a => a.name.toLowerCase().includes("compromisso"))?.id ?? accounts[0].id;
+  }, [accounts]);
+
+  const plans = useMemo(() => {
+    return (allCommitments as Commitment[])
+      .filter(c => c.recurrence === "PARCELADO" && (c.commitmentType === "expense" || !c.commitmentType))
+      .map(c => {
+        const n = Math.max(1, Number(c.installments ?? 1));
+        const paid = (c.paidPeriods as string[] ?? []).length;
+        const totalAmt = n * c.value;
+        const paidAmt = paid * c.value;
+        const remaining = totalAmt - paidAmt;
+        const progress = Math.round((paid / n) * 100);
+        const status = getPlanStatus(paid, n);
+        const accountName = accounts?.find(a => a.id === c.accountId)?.name ?? "";
+        const isPaidThisMonth = (c.paidPeriods as string[] ?? []).includes(currentPeriod);
+        const sortedPeriods = [...(c.paidPeriods as string[] ?? [])].sort();
+        return { ...c, n, paid, totalAmt, paidAmt, remaining, progress, status, accountName, isPaidThisMonth, sortedPeriods };
+      });
+  }, [allCommitments, accounts, currentPeriod]);
+
+  const active = plans.filter(p => p.status !== "Quitado");
+  const completed = plans.filter(p => p.status === "Quitado");
+
+  const summaryTotal = active.reduce((s, p) => s + p.totalAmt, 0);
+  const summaryPaid = active.reduce((s, p) => s + p.paidAmt, 0);
+  const summaryRemaining = active.reduce((s, p) => s + p.remaining, 0);
+
+  // ── Form helpers ──────────────────────────────────────────────────────────
+  function recompInstVal(total: string, count: string) {
+    const t = parseFloat(total.replace(/\./g, "").replace(",", "."));
+    const c = parseInt(count);
+    return (t > 0 && c > 0) ? ((t / c).toFixed(2).replace(".", ",")) : "";
+  }
+
+  function openNew() {
+    setEditingId(null);
+    setDesc(""); setTotalVal(""); setInstCount(""); setInstVal("");
+    setAccId(defaultAccId);
+    setStartDate(new Date().toISOString().split("T")[0]);
+    setShowModal(true);
+  }
+
+  function openEdit(c: typeof plans[0]) {
+    setEditingId(c.id);
+    setDesc(c.description);
+    setInstCount(String(c.n));
+    setInstVal(fromCents(c.value));
+    setTotalVal(fromCents(c.n * c.value));
+    setAccId(c.accountId ?? "");
+    setStartDate(c.startDate);
+    setShowModal(true);
+  }
 
   function handleSave() {
-    const val = parseFloat(amount.replace(/\./g, "").replace(",", "."));
-    if (!creditor || !val || val <= 0) {
-      toast({ title: "Erro", description: "Preencha credor e valor.", variant: "destructive" });
-      return;
-    }
+    if (!desc.trim()) return toast({ title: "Erro", description: "Informe a descrição.", variant: "destructive" });
+    const count = parseInt(instCount);
+    if (!count || count < 1) return toast({ title: "Erro", description: "Informe o nº de parcelas.", variant: "destructive" });
+    const iv = parseFloat(instVal.replace(/\./g, "").replace(",", "."));
+    if (!iv || iv <= 0) return toast({ title: "Erro", description: "Informe o valor da parcela.", variant: "destructive" });
+    const ivCents = Math.round(iv * 100);
+    const accountId = accId ? Number(accId) : (accounts?.[0]?.id ?? null);
     if (editingId) {
-      updateDebtMut({ id: editingId, data: { creditor, amount: Math.round(val * 100), priority } }, {
-        onSuccess: () => toast({ title: "Dívida atualizada" }),
+      updateCommitment({ id: editingId, data: { description: desc.trim(), value: ivCents, installments: count, accountId, startDate } }, {
+        onSuccess: () => { toast({ title: "Plano atualizado!" }); setShowModal(false); },
       });
     } else {
-      createDebt({
+      createCommitment({
         userId: user?.id ?? 0,
-        creditor,
-        amount: Math.round(val * 100),
-        registeredDate: new Date().toISOString().split("T")[0],
-        priority,
-        paid: false,
+        accountId,
+        description: desc.trim(),
+        value: ivCents,
+        startDate,
+        dueDate: null,
+        recurrence: "PARCELADO",
+        installments: count,
+        category: "Compromissos Financeiros",
+        commitmentType: "expense",
+        paidPeriods: [],
       }, {
-        onSuccess: () => toast({ title: "Dívida registrada" }),
+        onSuccess: () => {
+          toast({ title: "Plano criado!", description: `${fv(ivCents)}/mês · ${count} parcelas · Total: ${fv(ivCents * count)}` });
+          setShowModal(false);
+        },
       });
     }
-    resetForm();
   }
 
-  function resetForm() {
-    setCreditor("");
-    setAmount("");
-    setPriority("medium");
-    setEditingId(null);
-    setShowForm(false);
+  function handleDelete(id: number) {
+    deleteCommitment(id, { onSuccess: () => toast({ title: "Plano removido" }) });
   }
 
-  function startEdit(d: any) {
-    setCreditor(d.creditor);
-    setAmount(String((d.amount / 100).toFixed(2)).replace(".", ","));
-    setPriority(d.priority as DebtPriority);
-    setEditingId(d.id);
-    setShowForm(true);
-  }
-
-  function removeDebt(id: number) {
-    deleteDebtMut(id, { onSuccess: () => toast({ title: "Dívida removida" }) });
-  }
-
-  function markPaid(id: number) {
-    updateDebtMut({ id, data: { paid: true } }, {
-      onSuccess: () => toast({ title: "Dívida quitada!" }),
-    });
-  }
-
-  function markUnpaid(id: number) {
-    updateDebtMut({ id, data: { paid: false } });
-  }
-
-  const activeDebts = debts.filter((d) => !d.paid);
-  const paidDebts = debts.filter((d) => d.paid);
-  const totalDebt = activeDebts.reduce((sum, d) => sum + d.amount, 0);
-  const sortedActive = [...activeDebts].sort((a, b) => (priorityOrder[a.priority as DebtPriority] ?? 1) - (priorityOrder[b.priority as DebtPriority] ?? 1));
-
-  const formatValue = (value: number) => formatCurrency(value, user?.currency);
-
-  function openGlobalSim() {
-    setSimDebtId(null);
-    setSimPayment("");
-    setSimPriorityFilter("all");
-    setShowSimModal(true);
-  }
-
-  function openDebtSim(id: number) {
-    setSimDebtId(id);
-    setSimPayment("");
-    setSimPriorityFilter("all");
-    setShowSimModal(true);
-  }
-
-  function getSimTotal() {
-    if (simDebtId) {
-      const d = debts.find((x) => x.id === simDebtId);
-      return d ? d.amount : 0;
-    }
-    if (simPriorityFilter === "all") return totalDebt;
-    return activeDebts.filter((d) => d.priority === simPriorityFilter).reduce((s, d) => s + d.amount, 0);
-  }
-
-  function calcMonths() {
-    const payment = parseFloat(simPayment.replace(/\./g, "").replace(",", "."));
-    const total = getSimTotal();
-    if (!payment || payment <= 0 || total <= 0) return null;
-    return Math.ceil((total / 100) / payment);
-  }
-
-  function addToProjections(debtId: number) {
-    if (!user?.id) return;
-    const d = debts.find((x) => x.id === debtId);
-    if (!d) return;
-    const payment = parseFloat(simPayment.replace(/\./g, "").replace(",", "."));
-    if (!payment || payment <= 0) {
-      toast({ title: "Erro", description: "Defina a capacidade de pagamento mensal primeiro.", variant: "destructive" });
-      return;
-    }
-    const installmentCents = Math.round(payment * 100);
-    const months = Math.ceil(d.amount / installmentCents);
-
-    const debtAccount = accounts?.find((a) => a.name.toLowerCase().includes("despesa") || a.name.toLowerCase().includes("contas"));
-    const debtAccountId = debtAccount?.id || accounts?.[0]?.id || 0;
-
-    createCommitment({
-      userId: user.id,
-      accountId: debtAccountId,
-      description: `Pagamento Dívida: ${d.creditor}`,
-      value: installmentCents,
-      startDate: new Date().toISOString().split("T")[0],
-      dueDate: null,
-      recurrence: months > 1 ? "PARCELADO" : "FIXO",
-      installments: months > 1 ? months : null,
-      category: "Compromissos Financeiros",
-      commitmentType: "expense",
-      paidPeriods: [],
-    }, {
+  function handlePayPeriod(id: number) {
+    setPayingId(id);
+    payPeriod({ id, period: currentPeriod }, {
       onSuccess: () => {
-        toast({ title: "Adicionado às Projeções", description: `${formatValue(installmentCents)}/mês por ${months} ${months === 1 ? "mês" : "meses"} para "${d.creditor}"` });
+        toast({ title: "Pagamento registado!", description: `Parcela de ${formatPeriod(currentPeriod)} registada com sucesso.` });
+        setPayingId(null);
+      },
+      onError: (err: unknown) => {
+        toast({ title: "Erro", description: (err as Error).message ?? "Não foi possível registar.", variant: "destructive" });
+        setPayingId(null);
       },
     });
   }
 
-  const monthlyPaymentCapacity = useMemo(() => {
-    const payment = parseFloat(simPayment.replace(/\./g, "").replace(",", "."));
-    return payment > 0 ? payment : 0;
-  }, [simPayment]);
-
-  useEffect(() => {
-    if (totalDebt <= 0 || !simPayment) return;
-    const payment = parseFloat(simPayment.replace(/\./g, "").replace(",", "."));
-    if (!payment || payment <= 0) return;
-    const months = Math.ceil((totalDebt / 100) / payment);
-    if (months > 60) {
-      setShowAiPopup(true);
+  function saveDebt() {
+    if (!debtCreditor.trim() || !debtAmt) return toast({ title: "Erro", description: "Preencha credor e valor.", variant: "destructive" });
+    const v = toCents(debtAmt);
+    if (!v || v <= 0) return toast({ title: "Erro", description: "Valor inválido.", variant: "destructive" });
+    if (editingDebtId) {
+      updateDebtMut({ id: editingDebtId, data: { creditor: debtCreditor, amount: v, priority: debtPriority } }, { onSuccess: () => toast({ title: "Registo atualizado" }) });
+    } else {
+      createDebt({ userId: user?.id ?? 0, creditor: debtCreditor, amount: v, registeredDate: new Date().toISOString().split("T")[0], priority: debtPriority, paid: false }, { onSuccess: () => toast({ title: "Registo criado" }) });
     }
-  }, [totalDebt, simPayment]);
+    setDebtCreditor(""); setDebtAmt(""); setDebtPriority("medium"); setEditingDebtId(null); setShowDebtForm(false);
+  }
 
-  const strategies = [
-    { icon: Target, title: "Método Bola de Neve", desc: "Comece pagando a menor dívida primeiro. Ao quitá-la, direcione o valor para a próxima." },
-    { icon: TrendingUp, title: "Método Avalanche", desc: "Priorize a dívida com maior taxa de juros. Matematicamente mais eficiente." },
-    { icon: Shield, title: "Negociação", desc: "Negocie diretamente com credores. Muitos oferecem descontos para renegociação." },
-    { icon: Heart, title: "Equilíbrio Emocional", desc: "Crie um plano realista e celebre cada passo em direção à liberdade financeira." },
-  ];
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 pb-12">
+
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground" data-testid="text-debt-strategy-title">Estratégia de Dívidas</h1>
-          <p className="text-sm text-muted-foreground mt-1">Entenda suas dívidas e construa uma estratégia para retomar o controle financeiro.</p>
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground" data-testid="text-plan-title">Plano de Quitação</h1>
+          <p className="text-sm text-muted-foreground mt-1">Acompanhe compromissos de aquisição e a evolução dos pagamentos.</p>
         </div>
-        <Button className="rounded-2xl font-bold shrink-0" onClick={() => { resetForm(); setShowForm(true); }} data-testid="button-add-debt">
-          <PlusCircle className="w-4 h-4 mr-2" /> Nova Dívida
+        <Button className="rounded-2xl font-bold shrink-0" onClick={openNew} data-testid="button-new-plan">
+          <PlusCircle className="w-4 h-4 mr-2" /> Novo Plano
         </Button>
       </div>
 
-      {showForm && (
-        <Card className="p-5 rounded-2xl border-border space-y-4" data-testid="form-add-debt">
-          <h3 className="font-bold text-foreground">{editingId ? "Editar Dívida" : "Registrar Nova Dívida"}</h3>
-          <input
-            placeholder="Credor (ex: Banco, Loja...)"
-            className="w-full p-3 rounded-xl border border-input bg-background text-sm"
-            value={creditor}
-            onChange={(e) => setCreditor(e.target.value)}
-            data-testid="input-debt-creditor"
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input
-              placeholder="Valor da dívida (ex: 5.000,00)"
-              className="w-full p-3 rounded-xl border border-input bg-background text-sm"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              data-testid="input-debt-amount"
-            />
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Prioridade</label>
-              <div className="flex p-1 bg-muted rounded-xl">
-                {(["high", "medium", "low"] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPriority(p)}
-                    className={`flex-1 rounded-lg text-xs font-bold py-2.5 transition-all ${priority === p ? "bg-white dark:bg-background shadow-sm text-primary" : "text-muted-foreground"}`}
-                    data-testid={`btn-priority-${p}`}
-                  >
-                    {priorityLabel[p]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" className="rounded-xl" onClick={handleSave} data-testid="button-save-debt">
-              {editingId ? "Atualizar" : "Salvar"}
-            </Button>
-            <Button size="sm" variant="ghost" className="rounded-xl" onClick={resetForm}>Cancelar</Button>
-          </div>
-        </Card>
+      {/* Summary */}
+      {active.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="p-4 rounded-2xl border-border">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Comprometido</p>
+            <p className="text-lg sm:text-xl font-display font-bold text-foreground" data-testid="text-summary-total">{fv(summaryTotal)}</p>
+          </Card>
+          <Card className="p-4 rounded-2xl border-secondary/20 bg-secondary/5">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Pago</p>
+            <p className="text-lg sm:text-xl font-display font-bold text-secondary" data-testid="text-summary-paid">{fv(summaryPaid)}</p>
+          </Card>
+          <Card className="p-4 rounded-2xl border-primary/20 bg-primary/5">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Saldo Restante</p>
+            <p className="text-lg sm:text-xl font-display font-bold text-primary" data-testid="text-summary-remaining">{fv(summaryRemaining)}</p>
+          </Card>
+        </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <Card className="p-4 rounded-2xl border-destructive/15 bg-destructive/5">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Dívida Total</p>
-          <p className="text-xl sm:text-2xl font-display font-bold text-destructive" data-testid="text-total-debt">{formatValue(totalDebt)}</p>
-        </Card>
-        <Card className="p-4 rounded-2xl">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Dívidas Ativas</p>
-          <p className="text-xl sm:text-2xl font-display font-bold text-foreground" data-testid="text-active-debts">{activeDebts.length}</p>
-        </Card>
-        <Card className="p-4 rounded-2xl border-secondary/15 bg-secondary/5">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Dívidas Quitadas</p>
-          <p className="text-xl sm:text-2xl font-display font-bold text-secondary" data-testid="text-paid-debts">{paidDebts.length}</p>
-        </Card>
-      </div>
-
-      {activeDebts.length > 0 && (
-        <Button variant="outline" className="w-full rounded-2xl border-primary/30 text-primary font-bold text-sm" onClick={openGlobalSim} data-testid="button-simulate-global">
-          <Calculator className="w-4 h-4 mr-2" /> Simular Estratégia Completa
-        </Button>
-      )}
-
-      {sortedActive.length > 0 ? (
-        <div className="space-y-3">
-          <h2 className="text-lg font-display font-bold text-foreground">Dívidas Ativas</h2>
-          {sortedActive.map((d) => (
-            <Card key={d.id} className="p-4 rounded-2xl border-border" data-testid={`card-debt-${d.id}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="font-bold text-foreground" data-testid={`text-debt-creditor-${d.id}`}>{d.creditor}</h4>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${priorityColor[d.priority as DebtPriority]}`} data-testid={`badge-priority-${d.id}`}>
-                      {priorityLabel[d.priority as DebtPriority]}
-                    </span>
+      {/* Active plans */}
+      {active.length > 0 ? (
+        <div className="space-y-4">
+          <h2 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Planos Ativos</h2>
+          {active.map(plan => (
+            <Card key={plan.id} className="rounded-3xl border border-border shadow-sm overflow-hidden" data-testid={`card-plan-${plan.id}`}>
+              <div className="p-5">
+                {/* Header row */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-display font-bold text-lg text-foreground" data-testid={`text-plan-description-${plan.id}`}>{plan.description}</h3>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusStyle(plan.status)}`} data-testid={`badge-status-${plan.id}`}>
+                        {plan.status}
+                      </span>
+                    </div>
+                    {plan.accountName && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{plan.accountName} · Desde {new Date(plan.startDate + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">Registrada em {new Date(d.registeredDate + "T12:00:00").toLocaleDateString("pt-BR")}</p>
-                  <p className="text-xl font-display font-bold text-destructive mt-1" data-testid={`text-debt-amount-${d.id}`}>{formatValue(d.amount)}</p>
+                  <div className="flex gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-muted-foreground hover:text-primary" onClick={() => openEdit(plan)} data-testid={`button-edit-plan-${plan.id}`}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive" onClick={() => handleDelete(plan.id)} data-testid={`button-delete-plan-${plan.id}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1.5 shrink-0">
-                  <Button variant="outline" size="sm" className="rounded-lg text-xs min-h-[36px] sm:min-h-0" onClick={() => startEdit(d)} data-testid={`button-edit-debt-${d.id}`}>
-                    <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
-                  </Button>
-                  <Button variant="outline" size="sm" className="rounded-lg text-xs min-h-[36px] sm:min-h-0" onClick={() => openDebtSim(d.id)} data-testid={`button-sim-debt-${d.id}`}>
-                    <Calculator className="w-3.5 h-3.5 mr-1" /> Simular
-                  </Button>
-                  <Button variant="outline" size="sm" className="rounded-lg text-xs min-h-[36px] sm:min-h-0 text-secondary border-secondary/30" onClick={() => markPaid(d.id)} data-testid={`button-pay-debt-${d.id}`}>
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Quitar
-                  </Button>
-                  <Button variant="ghost" size="sm" className="rounded-lg text-xs text-muted-foreground" onClick={() => removeDebt(d.id)} data-testid={`button-remove-debt-${d.id}`}>
-                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
-                  </Button>
+
+                {/* Progress bar */}
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">{plan.paid}/{plan.n} parcelas · {plan.progress}% quitado</span>
+                    <span className="text-xs font-medium text-muted-foreground">{plan.n - plan.paid} pendentes</span>
+                  </div>
+                  <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-secondary to-secondary/70 rounded-full transition-all duration-700"
+                      style={{ width: `${plan.progress}%` }}
+                      data-testid={`progress-plan-${plan.id}`}
+                    />
+                  </div>
                 </div>
+
+                {/* Value grid */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+                  <div className="bg-muted/40 rounded-2xl p-3 text-center">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Total</p>
+                    <p className="font-display font-bold text-sm text-foreground" data-testid={`text-plan-total-${plan.id}`}>{fv(plan.totalAmt)}</p>
+                  </div>
+                  <div className="bg-secondary/5 border border-secondary/20 rounded-2xl p-3 text-center">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Pago</p>
+                    <p className="font-display font-bold text-sm text-secondary" data-testid={`text-plan-paid-${plan.id}`}>{fv(plan.paidAmt)}</p>
+                  </div>
+                  <div className="bg-primary/5 border border-primary/20 rounded-2xl p-3 text-center">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Restante</p>
+                    <p className="font-display font-bold text-sm text-primary" data-testid={`text-plan-remaining-${plan.id}`}>{fv(plan.remaining)}</p>
+                  </div>
+                </div>
+
+                {/* Pay row */}
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    Parcela mensal: <span className="font-bold text-foreground">{fv(plan.value)}</span>
+                  </p>
+                  {!plan.isPaidThisMonth ? (
+                    <Button
+                      size="sm"
+                      className="rounded-xl font-bold bg-secondary text-white hover:bg-secondary/90 gap-1.5"
+                      onClick={() => handlePayPeriod(plan.id)}
+                      disabled={payingId === plan.id || isPayingPeriod}
+                      data-testid={`button-pay-period-${plan.id}`}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {payingId === plan.id ? "A registar..." : `Pagar ${formatPeriod(currentPeriod)}`}
+                    </Button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-secondary bg-secondary/10 px-3 py-1.5 rounded-xl" data-testid={`badge-paid-this-month-${plan.id}`}>
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Pago este mês
+                    </span>
+                  )}
+                </div>
+
+                {/* Payment history */}
+                {plan.sortedPeriods.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border/50">
+                    <button
+                      className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setOpenHistoryId(openHistoryId === plan.id ? null : plan.id)}
+                      data-testid={`button-toggle-history-${plan.id}`}
+                    >
+                      <History className="w-3.5 h-3.5" />
+                      Histórico de pagamentos ({plan.sortedPeriods.length})
+                      {openHistoryId === plan.id ? <ChevronDown className="w-3 h-3 ml-1" /> : <ChevronRight className="w-3 h-3 ml-1" />}
+                    </button>
+                    {openHistoryId === plan.id && (
+                      <div className="mt-2 space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                        {plan.sortedPeriods.map(p => (
+                          <div key={p} className="flex items-center justify-between px-3 py-2 bg-secondary/5 border border-secondary/15 rounded-xl" data-testid={`row-history-${plan.id}-${p}`}>
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-secondary shrink-0" />
+                              <span className="text-xs font-medium capitalize">{formatPeriod(p)}</span>
+                            </div>
+                            <span className="text-xs font-bold text-secondary shrink-0">{fv(plan.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </Card>
           ))}
         </div>
       ) : (
-        <Card className="p-6 rounded-2xl border-border text-center" data-testid="text-no-debts">
-          <CreditCard className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Você não tem dívidas ativas registradas.</p>
-          <p className="text-xs text-muted-foreground mt-1">Clique em "Nova Dívida" para começar a gerenciar.</p>
+        <Card className="p-8 rounded-3xl border-2 border-dashed border-muted text-center" data-testid="text-no-plans">
+          <Target className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <p className="font-display font-bold text-foreground mb-1">Nenhum plano de quitação ativo</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Crie um plano para registar compromissos parcelados como aquisições, compras maiores ou financiamentos.
+          </p>
+          <Button className="rounded-2xl font-bold" onClick={openNew} data-testid="button-create-first-plan">
+            <PlusCircle className="w-4 h-4 mr-2" /> Criar Primeiro Plano
+          </Button>
         </Card>
       )}
 
-      {paidDebts.length > 0 && (
+      {/* Completed plans */}
+      {completed.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-display font-bold text-foreground flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-secondary" /> Dívidas Quitadas
+          <h2 className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em] flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" /> Planos Quitados ({completed.length})
           </h2>
-          {paidDebts.map((d) => (
-            <Card key={d.id} className="p-4 rounded-2xl border-secondary/20 bg-secondary/5 opacity-70" data-testid={`card-debt-paid-${d.id}`}>
+          {completed.map(plan => (
+            <Card key={plan.id} className="p-4 rounded-2xl border-secondary/20 bg-secondary/5 opacity-75" data-testid={`card-plan-done-${plan.id}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-medium text-foreground line-through">{d.creditor}</h4>
-                  <p className="text-sm font-bold text-secondary">{formatValue(d.amount)}</p>
+                  <p className="font-bold text-foreground">{plan.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {fv(plan.totalAmt)} · {plan.n} parcelas ·{" "}
+                    <span className="font-bold text-secondary">Quitado</span>
+                  </p>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" className="rounded-lg text-xs" onClick={() => markUnpaid(d.id)} data-testid={`button-reopen-debt-${d.id}`}>
-                    Reabrir
-                  </Button>
-                  <Button variant="ghost" size="sm" className="rounded-lg text-xs text-muted-foreground" onClick={() => removeDebt(d.id)} data-testid={`button-remove-paid-${d.id}`}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
+                <Button variant="ghost" size="sm" className="rounded-lg text-xs text-muted-foreground" onClick={() => handleDelete(plan.id)} data-testid={`button-delete-done-${plan.id}`}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
               </div>
             </Card>
           ))}
         </div>
       )}
 
-      <div className="space-y-3">
-        <h2 className="text-lg font-display font-bold text-foreground flex items-center gap-2">
-          <GraduationCap className="w-5 h-5 text-secondary" /> Estratégias de Pagamento
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {strategies.map((s, i) => (
-            <Card key={i} className="p-4 rounded-2xl border-border" data-testid={`card-strategy-${i}`}>
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <s.icon className="w-4 h-4 text-primary" />
+      {/* How it works info card */}
+      {plans.length === 0 && (
+        <Card className="p-5 rounded-3xl border-primary/15 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <TrendingDown className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h4 className="font-display font-bold text-foreground mb-1">Como funciona o Plano de Quitação</h4>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Registe o valor total e o número de parcelas</li>
+                <li>A parcela mensal aparece automaticamente em Projeções</li>
+                <li>Clique em "Pagar" para registar cada parcela paga</li>
+                <li>O saldo restante é atualizado automaticamente</li>
+                <li>Acompanhe o progresso até à quitação total</li>
+              </ul>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Old debts (registros avulsos) — collapsed section */}
+      <div className="border-t border-border/40 pt-4">
+        <button
+          className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+          onClick={() => setShowRegistros(!showRegistros)}
+          data-testid="button-toggle-registros"
+        >
+          {showRegistros ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
+          Registros Avulsos de Compromisso
+          {debts.length > 0 && (
+            <span className="ml-1 bg-muted text-muted-foreground px-2 py-0.5 rounded-full text-[10px] font-bold">{debts.length}</span>
+          )}
+        </button>
+
+        {showRegistros && (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Valores totais sem parcelamento detalhado.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl text-xs"
+                onClick={() => { setEditingDebtId(null); setDebtCreditor(""); setDebtAmt(""); setDebtPriority("medium"); setShowDebtForm(true); }}
+                data-testid="button-add-registro"
+              >
+                <PlusCircle className="w-3.5 h-3.5 mr-1" /> Adicionar
+              </Button>
+            </div>
+
+            {showDebtForm && (
+              <Card className="p-4 rounded-2xl border-border space-y-3" data-testid="form-add-debt">
+                <input
+                  placeholder="Credor / Descrição"
+                  className="w-full p-3 rounded-xl border border-input bg-background text-sm"
+                  value={debtCreditor}
+                  onChange={e => setDebtCreditor(e.target.value)}
+                  data-testid="input-debt-creditor"
+                />
+                <input
+                  placeholder="Valor total (ex: 5.000,00)"
+                  className="w-full p-3 rounded-xl border border-input bg-background text-sm"
+                  value={debtAmt}
+                  onChange={e => setDebtAmt(e.target.value)}
+                  data-testid="input-debt-amount"
+                />
+                <div className="flex p-1 bg-muted rounded-xl">
+                  {(["high", "medium", "low"] as const).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setDebtPriority(p)}
+                      className={`flex-1 rounded-lg text-xs font-bold py-2 transition-all ${debtPriority === p ? "bg-white dark:bg-background shadow-sm text-primary" : "text-muted-foreground"}`}
+                      data-testid={`btn-priority-${p}`}
+                    >
+                      {{ high: "Alta", medium: "Média", low: "Baixa" }[p]}
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <h4 className="font-bold text-sm text-foreground">{s.title}</h4>
-                  <p className="text-xs text-muted-foreground mt-0.5">{s.desc}</p>
+                <div className="flex gap-2">
+                  <Button size="sm" className="rounded-xl" onClick={saveDebt} data-testid="button-save-debt">{editingDebtId ? "Atualizar" : "Salvar"}</Button>
+                  <Button size="sm" variant="ghost" className="rounded-xl" onClick={() => setShowDebtForm(false)}>Cancelar</Button>
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            )}
+
+            {debts.length === 0 && !showDebtForm && (
+              <p className="text-xs text-muted-foreground italic text-center py-4">Nenhum registo avulso.</p>
+            )}
+
+            {debts.map(d => (
+              <Card key={d.id} className={`p-4 rounded-2xl border-border ${d.paid ? "opacity-60" : ""}`} data-testid={`card-registro-${d.id}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={`font-bold text-sm truncate ${d.paid ? "line-through text-muted-foreground" : "text-foreground"}`}>{d.creditor}</p>
+                    <p className={`text-sm font-bold mt-0.5 ${d.paid ? "text-secondary" : "text-foreground"}`}>{fv(d.amount)}</p>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    {!d.paid ? (
+                      <Button
+                        variant="outline" size="sm" className="rounded-lg text-xs text-secondary border-secondary/30"
+                        onClick={() => updateDebtMut({ id: d.id, data: { paid: true } }, { onSuccess: () => toast({ title: "Quitado!" }) })}
+                        data-testid={`button-pay-debt-${d.id}`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Quitar
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" className="rounded-lg text-xs" onClick={() => updateDebtMut({ id: d.id, data: { paid: false } })} data-testid={`button-reopen-debt-${d.id}`}>
+                        Reabrir
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost" size="sm" className="rounded-lg text-xs text-muted-foreground"
+                      onClick={() => deleteDebtMut(d.id, { onSuccess: () => toast({ title: "Removido" }) })}
+                      data-testid={`button-delete-debt-${d.id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+
+            {debts.length > 0 && (
+              <Button
+                variant="outline"
+                className="w-full rounded-2xl text-xs border-primary/20 text-primary font-bold"
+                onClick={() => navigate("/planos")}
+              >
+                Criar Plano de Quitação para organizar com parcelas
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
-      <Card className="p-6 rounded-3xl border-secondary/20 bg-gradient-to-br from-secondary/5 via-transparent to-primary/5" data-testid="card-debt-learning">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center shrink-0">
-            <GraduationCap className="w-6 h-6 text-secondary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="font-display font-bold text-foreground mb-1">Aprenda a gerenciar dívidas sem perder sua liberdade financeira.</h4>
-            <p className="text-sm text-muted-foreground">Dívida não deve definir seu futuro. Aprenda estratégias para reorganizar suas finanças, retomar o controle do seu fluxo de caixa e focar em realizar seus sonhos.</p>
-          </div>
-          <Button className="rounded-2xl bg-secondary text-white font-bold text-sm shrink-0" onClick={() => navigate("/planos")} data-testid="button-learn-more">
-            Saiba Mais <ArrowRight className="w-4 h-4 ml-1" />
-          </Button>
-        </div>
-      </Card>
-
-      {showSimModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowSimModal(false)}>
-          <Card className="w-full max-w-lg p-6 rounded-3xl shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} data-testid="modal-debt-simulation">
-            <Button variant="ghost" size="icon" className="absolute top-4 right-4 w-8 h-8" onClick={() => setShowSimModal(false)} data-testid="button-close-simulation">
+      {/* New / Edit Plan Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+          <Card className="w-full max-w-lg p-6 rounded-3xl shadow-2xl relative max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()} data-testid="modal-plan">
+            <Button variant="ghost" size="icon" className="absolute top-4 right-4 w-8 h-8" onClick={() => setShowModal(false)} data-testid="button-close-plan-modal">
               <X className="w-5 h-5" />
             </Button>
+
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Calculator className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Target className="w-5 h-5 text-primary" />
               </div>
-              <h3 className="font-display font-bold text-lg">
-                {simDebtId ? `Simular: ${debts.find((d) => d.id === simDebtId)?.creditor}` : "Simulação Completa"}
-              </h3>
+              <div>
+                <h3 className="font-display font-bold text-lg">{editingId ? "Editar Plano" : "Novo Plano de Quitação"}</h3>
+                <p className="text-xs text-muted-foreground">Compromisso parcelado vinculado a uma conta</p>
+              </div>
             </div>
 
             <div className="space-y-4">
-              <div className="bg-destructive/5 border border-destructive/15 rounded-2xl p-4">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                  {simDebtId ? "Valor desta dívida" : "Dívida total"}
-                </p>
-                <p className="text-2xl font-display font-bold text-destructive" data-testid="text-sim-total">{formatValue(getSimTotal())}</p>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Capacidade de pagamento mensal</label>
+              {/* Description */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Descrição do Compromisso</label>
                 <input
-                  placeholder="Ex: 500,00"
-                  className="w-full p-3 rounded-xl border border-input bg-background text-sm"
-                  value={simPayment}
-                  onChange={(e) => setSimPayment(e.target.value)}
-                  data-testid="input-sim-payment"
+                  placeholder="Ex: Brazza by Virginia, Equipamento, Carro..."
+                  className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                  value={desc}
+                  onChange={e => setDesc(e.target.value)}
+                  data-testid="input-plan-description"
                 />
               </div>
 
-              {(() => {
-                const months = calcMonths();
-                if (months === null) return null;
-                const years = Math.floor(months / 12);
-                const rem = months % 12;
-                return (
-                  <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 text-center space-y-1" data-testid="text-sim-result">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Prazo estimado para quitar</p>
-                    <p className="text-3xl font-display font-bold text-primary">
-                      {months} {months === 1 ? "mês" : "meses"}
-                    </p>
-                    {years >= 1 && (
-                      <p className="text-xs text-muted-foreground">
-                        ({years} {years === 1 ? "ano" : "anos"}{rem > 0 ? ` e ${rem} ${rem === 1 ? "mês" : "meses"}` : ""})
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {!simDebtId && activeDebts.length > 0 && (
-                <div className="space-y-3 pt-2 border-t border-border">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Priorizar por nível</label>
-                    <div className="flex p-1 bg-muted rounded-xl">
-                      {([["all", "Todas"], ["high", "Alta"], ["medium", "Média"], ["low", "Baixa"]] as const).map(([val, label]) => (
-                        <button
-                          key={val}
-                          onClick={() => setSimPriorityFilter(val)}
-                          className={`flex-1 rounded-lg text-xs font-bold py-2 transition-all ${simPriorityFilter === val ? "bg-white dark:bg-background shadow-sm text-primary" : "text-muted-foreground"}`}
-                          data-testid={`btn-sim-priority-${val}`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {simPriorityFilter !== "all" && (() => {
-                    const filtered = activeDebts.filter((d) => d.priority === simPriorityFilter);
-                    const filteredTotal = filtered.reduce((s, d) => s + d.amount, 0);
-                    const payment = parseFloat(simPayment.replace(/\./g, "").replace(",", "."));
-                    const pMonths = payment > 0 && filteredTotal > 0 ? Math.ceil((filteredTotal / 100) / payment) : null;
-                    return (
-                      <div className="space-y-2">
-                        {filtered.length > 0 ? (
-                          <>
-                            {filtered.map((d) => (
-                              <div key={d.id} className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2">
-                                <span className="text-sm font-medium truncate">{d.creditor}</span>
-                                <span className="text-sm font-bold text-destructive shrink-0 ml-2">{formatValue(d.amount)}</span>
-                              </div>
-                            ))}
-                            {pMonths && (
-                              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-center space-y-1" data-testid="text-sim-priority-result">
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                  Foco: Prioridade {priorityLabel[simPriorityFilter]} ({formatValue(filteredTotal)})
-                                </p>
-                                <p className="text-2xl font-display font-bold text-amber-600">
-                                  {pMonths} {pMonths === 1 ? "mês" : "meses"}
-                                </p>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-xs text-muted-foreground italic text-center py-2">Nenhuma dívida com esta prioridade.</p>
-                        )}
-                      </div>
-                    );
-                  })()}
+              {/* Count + Installment value */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Nº de Parcelas</label>
+                  <input
+                    placeholder="Ex: 10"
+                    type="number"
+                    min="1"
+                    className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                    value={instCount}
+                    onChange={e => {
+                      setInstCount(e.target.value);
+                      setInstVal(recompInstVal(totalVal, e.target.value));
+                    }}
+                    data-testid="input-plan-installments"
+                  />
                 </div>
-              )}
-
-              {simDebtId && calcMonths() && (
-                <Button
-                  className="w-full rounded-2xl font-bold"
-                  onClick={() => { addToProjections(simDebtId); setShowSimModal(false); }}
-                  data-testid="button-add-to-projections"
-                >
-                  <Send className="w-4 h-4 mr-2" /> Adicionar Parcela às Projeções
-                </Button>
-              )}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {showAiPopup && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAiPopup(false)}>
-          <Card className="w-full max-w-md p-6 rounded-3xl shadow-2xl relative" onClick={(e) => e.stopPropagation()} data-testid="modal-ai-guidance">
-            <Button variant="ghost" size="icon" className="absolute top-4 right-4 w-8 h-8" onClick={() => setShowAiPopup(false)} data-testid="button-close-ai-popup">
-              <X className="w-5 h-5" />
-            </Button>
-            <div className="text-center space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto">
-                <AlertTriangle className="w-7 h-7 text-amber-500" />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Valor da Parcela</label>
+                  <input
+                    placeholder="Ex: 1.000,00"
+                    className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                    value={instVal}
+                    onChange={e => {
+                      setInstVal(e.target.value);
+                      const iv = parseFloat(e.target.value.replace(/\./g, "").replace(",", "."));
+                      const cnt = parseInt(instCount);
+                      if (iv > 0 && cnt > 0) setTotalVal((iv * cnt).toFixed(2).replace(".", ","));
+                    }}
+                    data-testid="input-plan-installment-value"
+                  />
+                </div>
               </div>
-              <h3 className="font-display font-bold text-lg text-foreground">Sua situação pode precisar de uma estratégia estruturada.</h3>
-              <p className="text-sm text-muted-foreground">
-                Com o pagamento mensal informado, o prazo para quitar suas dívidas é superior a 5 anos. Considere conhecer nossa mentoria financeira especializada para criar um plano personalizado.
-              </p>
-              <Button className="rounded-2xl bg-secondary text-white font-bold" onClick={() => { setShowAiPopup(false); navigate("/planos"); }} data-testid="button-ai-learn-more">
-                Saiba Mais <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
+
+              {/* Total value */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Valor Total do Compromisso</label>
+                <input
+                  placeholder="Ex: 10.000,00"
+                  className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                  value={totalVal}
+                  onChange={e => {
+                    setTotalVal(e.target.value);
+                    setInstVal(recompInstVal(e.target.value, instCount));
+                  }}
+                  data-testid="input-plan-total"
+                />
+                {instCount && instVal && (() => {
+                  const iv = parseFloat(instVal.replace(/\./g, "").replace(",", "."));
+                  const cnt = parseInt(instCount);
+                  return (iv > 0 && cnt > 0) ? (
+                    <p className="text-xs text-muted-foreground ml-1">
+                      {cnt}× {fv(Math.round(iv * 100))} = <span className="font-bold text-foreground">{fv(Math.round(iv * 100) * cnt)}</span>
+                    </p>
+                  ) : null;
+                })()}
+              </div>
+
+              {/* Account */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Conta de Débito</label>
+                <select
+                  className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium appearance-none cursor-pointer"
+                  value={accId}
+                  onChange={e => setAccId(Number(e.target.value))}
+                  data-testid="select-plan-account"
+                >
+                  {accounts?.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+
+              {/* Start date */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Início do Pagamento</label>
+                <input
+                  type="date"
+                  className="w-full h-14 px-5 rounded-2xl border border-border bg-background outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  data-testid="input-plan-start-date"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button className="flex-1 rounded-2xl font-bold" onClick={handleSave} data-testid="button-save-plan">
+                  {editingId ? "Atualizar Plano" : "Criar Plano"}
+                </Button>
+                <Button variant="outline" className="rounded-2xl" onClick={() => setShowModal(false)}>Cancelar</Button>
+              </div>
             </div>
           </Card>
         </div>

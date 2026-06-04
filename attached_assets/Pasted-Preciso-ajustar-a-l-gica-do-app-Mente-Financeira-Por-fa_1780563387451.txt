@@ -1,0 +1,74 @@
+Preciso ajustar a lógica do app Mente Financeira.
+
+Por favor, substitua o nome da aba/categoria “Dívida” por um nome mais positivo e próspero. Sugestão principal: “Plano de Quitação”.
+Outra opção aceitável: “Compromissos de Aquisição”.
+
+A lógica que preciso é a seguinte:
+
+No app existe uma conta chamada “Compromissos Financeiros”. Essa conta será usada para compromissos que não fazem parte do operacional do negócio, mas sim de aquisições, compras maiores, parcelamentos ou compromissos assumidos, como por exemplo a compra do Brazza pela Virgínia.
+
+Exemplo:
+A Virgínia comprou o Brazza e assumiu um compromisso parcelado. Esse compromisso total deve aparecer na aba “Plano de Quitação”, mostrando:
+
+* Valor total do compromisso;
+* Valor já pago;
+* Saldo restante;
+* Quantidade de parcelas;
+* Parcelas pagas;
+* Parcelas pendentes;
+* Histórico de pagamentos;
+* Status: Em aberto, Em andamento ou Quitado.
+
+A parcela mensal desse compromisso deve aparecer no mês vigente como uma projeção de pagamento, debitando da conta “Compromissos Financeiros”.
+
+Enquanto a parcela ainda não for paga, ela deve ficar visível como compromisso pendente dentro da conta “Compromissos Financeiros”.
+
+Quando a parcela for paga, o sistema deve fazer três coisas automaticamente:
+
+1. Registrar o pagamento abaixo da conta “Compromissos Financeiros”, como histórico do que foi pago.
+2. Atualizar o compromisso principal na aba “Plano de Quitação”.
+3. Reduzir o saldo total restante do compromisso.
+
+Exemplo prático:
+
+Compromisso total: €10.000
+Parcela mensal: €1.000
+Conta usada para pagamento: Compromissos Financeiros
+
+Antes do pagamento:
+Valor total: €10.000
+Valor pago: €0
+Saldo restante: €10.000
+Status: Em aberto
+
+Após pagar uma parcela de €1.000:
+Valor total: €10.000
+Valor pago: €1.000
+Saldo restante: €9.000
+Parcelas pagas: 1
+Status: Em andamento
+
+O pagamento não pode ficar registrado apenas como uma transação isolada. Ele precisa estar vinculado ao compromisso principal.
+
+Também preciso que o app permita visualizar claramente:
+
+Na conta “Compromissos Financeiros”:
+
+* Parcelas previstas para o mês;
+* Parcelas ainda pendentes;
+* Parcelas já pagas;
+* Total disponível/destinado para essa conta;
+* Histórico dos pagamentos feitos.
+
+Na aba “Plano de Quitação”:
+
+* Lista dos compromissos cadastrados;
+* Valor total de cada compromisso;
+* Valor já pago;
+* Saldo restante;
+* Histórico dos pagamentos;
+* Evolução da quitação.
+
+A ideia é que eu consiga separar uma porcentagem do faturamento para a conta “Compromissos Financeiros” e acompanhar com clareza quanto já foi pago e quanto ainda falta pagar de cada compromisso assumido.
+
+Por favor, revise a estrutura atual do banco de dados, os relacionamentos entre compromissos, parcelas, projeções mensais e pagamentos, e crie essa ligação automática entre o pagamento da parcela e a atualização do saldo total do compromisso.

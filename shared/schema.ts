@@ -103,6 +103,29 @@ export const expenseCategories = pgTable("expense_categories", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const ideaProjects = pgTable("idea_projects", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").notNull().default("violet"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const projectStages = pgTable("project_stages", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  objective: text("objective"),
+  nextSteps: text("next_steps"),
+  blockers: text("blockers"),
+  revenuePotential: text("revenue_potential"),
+  isActive: boolean("is_active").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, trialStartDate: true });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true });
 export const insertTransactionSchema = createInsertSchema(transactions)
@@ -154,6 +177,14 @@ export type InsertFixedCost = z.infer<typeof insertFixedCostSchema>;
 
 export type ExpenseCategory = typeof expenseCategories.$inferSelect;
 export type InsertExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
+
+export const insertIdeaProjectSchema = createInsertSchema(ideaProjects).omit({ id: true, createdAt: true });
+export const insertProjectStageSchema = createInsertSchema(projectStages).omit({ id: true, createdAt: true });
+
+export type IdeaProject = typeof ideaProjects.$inferSelect;
+export type InsertIdeaProject = z.infer<typeof insertIdeaProjectSchema>;
+export type ProjectStage = typeof projectStages.$inferSelect;
+export type InsertProjectStage = z.infer<typeof insertProjectStageSchema>;
 
 export type UpdateAccountPercentagesRequest = {
   updates: { id: number; percentage: number }[];

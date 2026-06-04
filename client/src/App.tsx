@@ -16,6 +16,7 @@ import Education from "./pages/Education";
 import Plans from "./pages/Plans";
 import MentoriaWelcome from "./pages/MentoriaWelcome";
 import DebtStrategy from "./pages/DebtStrategy";
+import IdeaProjects from "./pages/IdeaProjects";
 import ResultsDistribution from "./pages/ResultsDistribution";
 import ResetPassword from "./pages/ResetPassword";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -107,6 +108,7 @@ function AppRoutes() {
         <Route path="/planos" component={Plans} />
         <Route path="/mentoria/boas-vindas" component={MentoriaWelcome} />
         <Route path="/dividas" component={DebtStrategy} />
+        <Route path="/ideias" component={IdeaProjects} />
         <Route path="/resultados" component={ResultsDistribution} />
         <Route component={NotFound} />
       </Switch>

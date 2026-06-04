@@ -32,6 +32,7 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - Redistribute balances: toggle in Settings to redistribute ecosystem balance when changing percentages
 - Dashboard with alerts and motivational messages (shows both expense and income alerts)
 - Debt Strategy page (/dividas): full CRUD debt management with priority levels (Alta/Média/Baixa), per-debt simulation, mark as paid/unpaid, add installment to Projections, AI guidance popup, strategy cards
+- Gestão de Ideias (/ideias): project management with fully customizable stages per project — add, rename, reorder, delete stages; edit objective, next steps, blockers, revenue potential per stage; mark active stage; 5 pre-set stage methodologies + custom mode
 - Dashboard compact debt summary card: clickable card showing active debt count + total, navigates to /dividas
 - AI Mentor: dynamic motivational messages based on financial context
 - PWA (Progressive Web App): installable on mobile/desktop, offline-capable
@@ -46,6 +47,8 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - `transactions`: id (serial), userId, accountId, description, amount (cents), type, date, isRecurring, category
 - `commitments`: id (serial), userId, accountId, description, value (cents), startDate, recurrence (FIXO|SEMANAL|PARCELADO), installments (nullable), category, commitmentType (expense|income), paidPeriods (text[]), createdAt
 - `debts`: id (serial), userId, creditor, amount (cents), registeredDate, priority (alta|media|baixa), paid (boolean), createdAt
+- `idea_projects`: id (serial), userId, name, description, color, createdAt
+- `project_stages`: id (serial), projectId, userId, name, objective, nextSteps, blockers, revenuePotential, isActive (boolean), sortOrder, createdAt
 - `stripe.*`: Managed by stripe-replit-sync (products, prices, subscriptions, etc.)
 
 ## Important Notes
@@ -86,4 +89,5 @@ Premium financial SaaS app for SGS Group brand (Brazil + Europe). Features the "
 - `client/src/components/layout/MainLayout.tsx` — App layout with user menu
 - `client/src/pages/PrivacyPolicy.tsx` — GDPR Privacy Policy (public, no auth)
 - `client/src/pages/TermsOfUse.tsx` — Terms of Use (public, no auth)
+- `client/src/pages/IdeaProjects.tsx` — Gestão de Ideias with customizable project stages
 - `client/src/components/layout/AppSidebar.tsx` — Navigation sidebar

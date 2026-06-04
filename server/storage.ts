@@ -1,7 +1,7 @@
 import { db } from "./db";
 import {
   users, accounts, transactions, transactionAllocations, commitments, debts,
-  businessSettings, fixedCosts, expenseCategories, ideaProjects, projectStages,
+  businessSettings, fixedCosts, expenseCategories,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Transaction, type InsertTransaction,
@@ -10,8 +10,6 @@ import {
   type BusinessSettings, type InsertBusinessSettings,
   type FixedCost, type InsertFixedCost,
   type ExpenseCategory, type InsertExpenseCategory,
-  type IdeaProject, type InsertIdeaProject,
-  type ProjectStage, type InsertProjectStage,
   type UpdateAccountPercentagesRequest,
   type DistributeIncomeRequest
 } from "@shared/schema";
@@ -194,15 +192,6 @@ export interface IStorage {
   updateExpenseCategory(userId: number, id: number, data: Partial<ExpenseCategory>): Promise<ExpenseCategory>;
   deleteExpenseCategory(userId: number, id: number): Promise<void>;
   reorderExpenseCategories(userId: number, accountType: string, orderedIds: number[]): Promise<void>;
-  getIdeaProjects(userId: number): Promise<IdeaProject[]>;
-  createIdeaProject(data: InsertIdeaProject): Promise<IdeaProject>;
-  updateIdeaProject(userId: number, id: number, data: Partial<IdeaProject>): Promise<IdeaProject>;
-  deleteIdeaProject(userId: number, id: number): Promise<void>;
-  getProjectStages(userId: number, projectId: number): Promise<ProjectStage[]>;
-  createProjectStage(data: InsertProjectStage): Promise<ProjectStage>;
-  updateProjectStage(userId: number, id: number, data: Partial<ProjectStage>): Promise<ProjectStage>;
-  deleteProjectStage(userId: number, id: number): Promise<void>;
-  reorderProjectStages(userId: number, projectId: number, orderedIds: number[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -739,61 +728,6 @@ export class DatabaseStorage implements IStorage {
         .update(expenseCategories)
         .set({ sortOrder: i })
         .where(and(eq(expenseCategories.id, orderedIds[i]), eq(expenseCategories.userId, userId)));
-    }
-  }
-
-  async getIdeaProjects(userId: number): Promise<IdeaProject[]> {
-    return db.select().from(ideaProjects).where(eq(ideaProjects.userId, userId)).orderBy(asc(ideaProjects.createdAt));
-  }
-
-  async createIdeaProject(data: InsertIdeaProject): Promise<IdeaProject> {
-    const [project] = await db.insert(ideaProjects).values(data).returning();
-    return project;
-  }
-
-  async updateIdeaProject(userId: number, id: number, data: Partial<IdeaProject>): Promise<IdeaProject> {
-    const [existing] = await db.select().from(ideaProjects).where(eq(ideaProjects.id, id));
-    if (!existing || existing.userId !== userId) throw new Error("Projeto não encontrado");
-    const [updated] = await db.update(ideaProjects).set(data).where(eq(ideaProjects.id, id)).returning();
-    return updated;
-  }
-
-  async deleteIdeaProject(userId: number, id: number): Promise<void> {
-    const [existing] = await db.select().from(ideaProjects).where(eq(ideaProjects.id, id));
-    if (!existing || existing.userId !== userId) throw new Error("Projeto não encontrado");
-    await db.delete(projectStages).where(eq(projectStages.projectId, id));
-    await db.delete(ideaProjects).where(eq(ideaProjects.id, id));
-  }
-
-  async getProjectStages(userId: number, projectId: number): Promise<ProjectStage[]> {
-    return db.select().from(projectStages)
-      .where(and(eq(projectStages.projectId, projectId), eq(projectStages.userId, userId)))
-      .orderBy(asc(projectStages.sortOrder), asc(projectStages.createdAt));
-  }
-
-  async createProjectStage(data: InsertProjectStage): Promise<ProjectStage> {
-    const [stage] = await db.insert(projectStages).values(data).returning();
-    return stage;
-  }
-
-  async updateProjectStage(userId: number, id: number, data: Partial<ProjectStage>): Promise<ProjectStage> {
-    const [existing] = await db.select().from(projectStages).where(eq(projectStages.id, id));
-    if (!existing || existing.userId !== userId) throw new Error("Etapa não encontrada");
-    const [updated] = await db.update(projectStages).set(data).where(eq(projectStages.id, id)).returning();
-    return updated;
-  }
-
-  async deleteProjectStage(userId: number, id: number): Promise<void> {
-    const [existing] = await db.select().from(projectStages).where(eq(projectStages.id, id));
-    if (!existing || existing.userId !== userId) throw new Error("Etapa não encontrada");
-    await db.delete(projectStages).where(eq(projectStages.id, id));
-  }
-
-  async reorderProjectStages(userId: number, projectId: number, orderedIds: number[]): Promise<void> {
-    for (let i = 0; i < orderedIds.length; i++) {
-      await db.update(projectStages)
-        .set({ sortOrder: i })
-        .where(and(eq(projectStages.id, orderedIds[i]), eq(projectStages.userId, userId), eq(projectStages.projectId, projectId)));
     }
   }
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowUpRight, ArrowDownRight, Receipt, Pencil, Trash2, PlusCircle, Globe, Link2, ChevronDown } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Receipt, Pencil, Trash2, PlusCircle, Link2, ChevronDown, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,8 @@ export default function Payments() {
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [incomeSearch, setIncomeSearch] = useState("");
+  const [expenseSearch, setExpenseSearch] = useState("");
   const editingTx = useMemo(
     () => (transactions || []).find((t: any) => t.id === editingId) || null,
     [transactions, editingId]
@@ -267,8 +269,51 @@ export default function Payments() {
     return [...(transactions || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions]);
 
-  const incomeList = useMemo(() => list.filter((tx) => tx.type === "income"), [list]);
-  const expenseList = useMemo(() => list.filter((tx) => tx.type === "expense"), [list]);
+  // Normalize text for accent-insensitive, case-insensitive search
+  function normalizeText(s: string) {
+    return (s || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+  }
+
+  const incomeListAll = useMemo(() => list.filter((tx) => tx.type === "income"), [list]);
+  const expenseListAll = useMemo(() => list.filter((tx) => tx.type === "expense"), [list]);
+
+  // Month-filtered lists (no search active)
+  const incomeListMonth = useMemo(() =>
+    incomeListAll.filter((tx) => {
+      const d = new Date(tx.date);
+      return d.getFullYear() === filterYear && d.getMonth() === filterMonth;
+    }), [incomeListAll, filterYear, filterMonth]);
+
+  const expenseListMonth = useMemo(() =>
+    expenseListAll.filter((tx) => {
+      const d = new Date(tx.date);
+      return d.getFullYear() === filterYear && d.getMonth() === filterMonth;
+    }), [expenseListAll, filterYear, filterMonth]);
+
+  // Search-filtered lists (all months)
+  const incomeListSearched = useMemo(() => {
+    const q = normalizeText(incomeSearch.trim());
+    if (!q) return null;
+    return incomeListAll.filter((tx) => normalizeText(tx.description).includes(q));
+  }, [incomeListAll, incomeSearch]);
+
+  const expenseListSearched = useMemo(() => {
+    const q = normalizeText(expenseSearch.trim());
+    if (!q) return null;
+    return expenseListAll.filter((tx) =>
+      normalizeText(tx.description).includes(q) || normalizeText(tx.category || "").includes(q)
+    );
+  }, [expenseListAll, expenseSearch]);
+
+  // Active display lists
+  const incomeList = incomeListSearched ?? incomeListMonth;
+  const expenseList = expenseListSearched ?? expenseListMonth;
+
+  // Totals
+  const incomeTotalMonth = useMemo(() => incomeListMonth.reduce((s, t) => s + t.amount, 0), [incomeListMonth]);
+  const expenseTotalMonth = useMemo(() => expenseListMonth.reduce((s, t) => s + t.amount, 0), [expenseListMonth]);
+  const incomeTotalDisplay = useMemo(() => incomeList.reduce((s, t) => s + t.amount, 0), [incomeList]);
+  const expenseTotalDisplay = useMemo(() => expenseList.reduce((s, t) => s + t.amount, 0), [expenseList]);
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
@@ -441,6 +486,50 @@ export default function Payments() {
         </Card>
       </div>
 
+      {/* Month/Year Navigator for History */}
+      <Card className="p-5 rounded-3xl border-border shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
+            onClick={() => setFilterYear(y => y - 1)}
+          >
+            <ChevronLeft className="w-4 h-4" /> {filterYear - 1}
+          </button>
+          <span className="text-base font-bold text-foreground">{filterYear}</span>
+          <button
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
+            onClick={() => setFilterYear(y => y + 1)}
+          >
+            {filterYear + 1} <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+          {["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"].map((m, i) => (
+            <button
+              key={i}
+              onClick={() => setFilterMonth(i)}
+              className={`py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                filterMonth === i
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/50"
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground border-t border-border pt-3">
+          <span>
+            <span className="font-semibold text-secondary">Entradas:</span>{" "}
+            {incomeListMonth.length} registro{incomeListMonth.length !== 1 ? "s" : ""} · {formatCurrency(incomeTotalMonth, user?.currency)}
+          </span>
+          <span>
+            <span className="font-semibold text-destructive">Saídas:</span>{" "}
+            {expenseListMonth.length} registro{expenseListMonth.length !== 1 ? "s" : ""} · {formatCurrency(expenseTotalMonth, user?.currency)}
+          </span>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6" data-testid="card-transaction-history">
 
         {/* Histórico de Entradas */}
@@ -457,18 +546,49 @@ export default function Payments() {
               <div>
                 <h2 className="font-bold text-lg text-foreground">Histórico de Entradas</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {incomeList.length > 0
-                    ? `${incomeList.length} ${incomeList.length === 1 ? "entrada registrada" : "entradas registradas"}`
-                    : "Nenhuma entrada encontrada"}
+                  {incomeListSearched
+                    ? `${incomeList.length} resultado${incomeList.length !== 1 ? "s" : ""} · ${formatCurrency(incomeTotalDisplay, user?.currency)} (todo o histórico)`
+                    : incomeList.length > 0
+                      ? `${incomeList.length} ${incomeList.length === 1 ? "entrada" : "entradas"} · ${formatCurrency(incomeTotalDisplay, user?.currency)}`
+                      : "Nenhuma entrada encontrada"}
                 </p>
               </div>
             </div>
             <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${historyOpen ? "rotate-180" : ""}`} />
           </button>
           {historyOpen && (
+            <div className="flex flex-col">
+              {/* Search bar */}
+              <div className="px-4 pt-3 pb-2 border-b border-secondary/10">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    className="w-full pl-8 pr-8 py-2 rounded-xl border border-input bg-background text-sm placeholder:text-muted-foreground/60"
+                    placeholder="Buscar cliente ou pagamento (todo o histórico)…"
+                    value={incomeSearch}
+                    onChange={(e) => setIncomeSearch(e.target.value)}
+                    data-testid="input-income-search"
+                  />
+                  {incomeSearch && (
+                    <button
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md hover:bg-muted/50"
+                      onClick={() => setIncomeSearch("")}
+                    >
+                      <X className="w-3.5 h-3.5 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+                {incomeListSearched && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1.5">
+                    Resultados encontrados em todo o histórico.
+                  </p>
+                )}
+              </div>
             <div className="divide-y divide-border overflow-y-auto max-h-[500px]" data-testid="content-income-history">
               {incomeList.length === 0 ? (
-                <div className="p-10 text-center text-muted-foreground text-sm">Nenhuma entrada registrada.</div>
+                <div className="p-10 text-center text-muted-foreground text-sm">
+                  {incomeSearch ? "Nenhuma entrada encontrada para esta busca." : "Nenhuma entrada registrada."}
+                </div>
               ) : (
                 incomeList.map((tx) => {
                   const accountName = tx.accountId != null ? accountsById.get(tx.accountId)?.name : "Ecossistema (Distribuído)";
@@ -504,6 +624,7 @@ export default function Payments() {
                 })
               )}
             </div>
+            </div>
           )}
         </Card>
 
@@ -521,18 +642,49 @@ export default function Payments() {
               <div>
                 <h2 className="font-bold text-lg text-foreground">Histórico de Saídas</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {expenseList.length > 0
-                    ? `${expenseList.length} ${expenseList.length === 1 ? "saída registrada" : "saídas registradas"}`
-                    : "Nenhuma saída encontrada"}
+                  {expenseListSearched
+                    ? `${expenseList.length} resultado${expenseList.length !== 1 ? "s" : ""} · ${formatCurrency(expenseTotalDisplay, user?.currency)} (todo o histórico)`
+                    : expenseList.length > 0
+                      ? `${expenseList.length} ${expenseList.length === 1 ? "saída" : "saídas"} · ${formatCurrency(expenseTotalDisplay, user?.currency)}`
+                      : "Nenhuma saída encontrada"}
                 </p>
               </div>
             </div>
             <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0 ${historyOpen ? "rotate-180" : ""}`} />
           </button>
           {historyOpen && (
+            <div className="flex flex-col">
+              {/* Search bar */}
+              <div className="px-4 pt-3 pb-2 border-b border-destructive/10">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    className="w-full pl-8 pr-8 py-2 rounded-xl border border-input bg-background text-sm placeholder:text-muted-foreground/60"
+                    placeholder="Buscar fornecedor, despesa ou categoria…"
+                    value={expenseSearch}
+                    onChange={(e) => setExpenseSearch(e.target.value)}
+                    data-testid="input-expense-search"
+                  />
+                  {expenseSearch && (
+                    <button
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md hover:bg-muted/50"
+                      onClick={() => setExpenseSearch("")}
+                    >
+                      <X className="w-3.5 h-3.5 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+                {expenseListSearched && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1.5">
+                    Resultados encontrados em todo o histórico.
+                  </p>
+                )}
+              </div>
             <div className="divide-y divide-border overflow-y-auto max-h-[500px]" data-testid="content-expense-history">
               {expenseList.length === 0 ? (
-                <div className="p-10 text-center text-muted-foreground text-sm">Nenhuma saída registrada.</div>
+                <div className="p-10 text-center text-muted-foreground text-sm">
+                  {expenseSearch ? "Nenhuma saída encontrada para esta busca." : "Nenhuma saída registrada."}
+                </div>
               ) : (
                 expenseList.map((tx) => {
                   const accountName = tx.accountId != null ? accountsById.get(tx.accountId)?.name : "Ecossistema (Distribuído)";
@@ -572,6 +724,7 @@ export default function Payments() {
                   );
                 })
               )}
+            </div>
             </div>
           )}
         </Card>

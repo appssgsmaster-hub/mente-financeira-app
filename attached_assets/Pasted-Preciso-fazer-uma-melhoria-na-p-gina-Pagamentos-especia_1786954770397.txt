@@ -1,0 +1,131 @@
+Preciso fazer uma melhoria na página **Pagamentos**, especialmente na visualização do **Histórico de Entradas** e do **Histórico de Saídas**.
+
+IMPORTANTE:
+
+* Não remover nem alterar funcionalidades existentes.
+* Não modificar a lógica atual de registro, edição ou exclusão das transações.
+* Não apagar ou alterar nenhum dado já registrado.
+* Apenas adicionar as novas opções de busca e organização descritas abaixo.
+* Manter o mesmo padrão visual atual do aplicativo.
+
+## 1. Busca por cliente no Histórico de Entradas
+
+Adicionar um campo de busca visível na seção **Histórico de Entradas**.
+
+A busca deve permitir localizar uma entrada digitando:
+
+* Nome do cliente;
+* Parte do nome do cliente;
+* Nome ou parte da descrição do serviço/pagamento.
+
+A filtragem deve acontecer enquanto o usuário digita, sem precisar recarregar a página.
+
+O objetivo principal dessa busca é permitir que, antes de registrar uma nova entrada, eu consiga verificar rapidamente se já existe algum pagamento relacionado àquele cliente, evitando pagamentos duplicados.
+
+A pesquisa deve considerar todas as entradas registradas, inclusive entradas de outros meses e anos, e não somente as transações que estiverem aparecendo no mês selecionado.
+
+Quando não houver resultado, mostrar uma mensagem simples:
+
+**“Nenhuma entrada encontrada para esta busca.”**
+
+Também deve existir uma forma simples de limpar a busca e voltar à visualização normal.
+
+## 2. Busca no Histórico de Saídas
+
+Adicionar também um campo de busca na seção **Histórico de Saídas**.
+
+A busca deve permitir localizar uma saída por:
+
+* Nome do fornecedor ou beneficiário;
+* Parte do nome;
+* Descrição do pagamento;
+* Categoria da despesa.
+
+A filtragem também deve acontecer enquanto o usuário digita.
+
+## 3. Organização por mês e ano
+
+Na página **Pagamentos**, adicionar uma navegação por **ano e mês**, seguindo o mesmo padrão visual e de funcionamento que já existe no **Painel Financeiro**.
+
+Usar como referência o seletor atual do Painel, que possui:
+
+* Ano anterior;
+* Ano atual;
+* Próximo ano;
+* Botões de janeiro a dezembro;
+* Destaque visual no mês selecionado.
+
+Ao selecionar um mês, os históricos devem mostrar somente:
+
+* As entradas daquele mês;
+* As saídas daquele mês.
+
+Exemplo:
+
+Ao selecionar **Agosto de 2026**, o Histórico de Entradas e o Histórico de Saídas devem apresentar somente as transações com data em agosto de 2026.
+
+Ao mudar o mês ou o ano, as duas listas devem ser atualizadas automaticamente.
+
+## 4. Totais do período selecionado
+
+Na área mensal, mostrar de forma simples:
+
+* Total de entradas no mês selecionado;
+* Total de saídas no mês selecionado;
+* Quantidade de entradas encontradas;
+* Quantidade de saídas encontradas.
+
+Esses totais devem ser calculados com base no mês e ano selecionados.
+
+Se houver uma busca ativa, a lista pode ser filtrada, mas o sistema deve deixar claro se o total apresentado é:
+
+* O total geral do mês; ou
+* O total dos resultados encontrados na busca.
+
+Não misturar esses dois valores.
+
+## 5. Comportamento esperado da busca e do filtro mensal
+
+A busca de clientes no Histórico de Entradas precisa pesquisar em **todo o histórico**, mesmo que exista um mês selecionado, porque sua principal finalidade é verificar se o pagamento já foi registrado anteriormente.
+
+Quando houver uma busca ativa:
+
+* Mostrar todos os resultados encontrados, independentemente do mês;
+* Exibir a data completa de cada entrada;
+* Se possível, indicar o mês e o ano da transação;
+* Mostrar uma mensagem como: **“Resultados encontrados em todo o histórico.”**
+
+Ao limpar a busca, o sistema deve voltar automaticamente para o mês que estava selecionado anteriormente.
+
+## 6. Interface
+
+Manter a página organizada, simples e fácil de usar.
+
+Sugestão de organização:
+
+1. Seletor de ano e mês;
+2. Campo **“Buscar cliente ou pagamento nas entradas”**;
+3. Campo **“Buscar fornecedor ou despesa nas saídas”**;
+4. Histórico de Entradas;
+5. Histórico de Saídas.
+
+Os campos de busca também podem ficar dentro de seus respectivos cards, desde que permaneçam visíveis e fáceis de encontrar.
+
+## 7. Verificação antes de finalizar
+
+Depois da implementação, testar:
+
+* Busca pelo nome completo do cliente;
+* Busca por parte do nome;
+* Busca por descrição do serviço;
+* Busca com letras maiúsculas e minúsculas;
+* Busca com acentos;
+* Busca em entradas de meses anteriores;
+* Seleção de diferentes meses e anos;
+* Entrada e saída registradas no mesmo mês;
+* Edição e exclusão de transações após aplicar os filtros;
+* Limpeza da busca;
+* Atualização correta das listas após registrar uma nova transação;
+* Preservação de todos os dados e funcionalidades atuais.
+
+Antes de concluir, confirme que nenhuma entrada ou saída existente foi apagada, duplicada ou modificada durante a implementação.
